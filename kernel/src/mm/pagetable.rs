@@ -723,6 +723,19 @@ impl PageTable {
         entry.set(make_private_address(addr), flags);
     }
 
+    fn make_pte_shadow_stack(entry: &mut PTEntry) {
+        // Shadow stack pages must have the dirty bit set and the write bit
+        // must be clear.
+        let mut flags = entry.flags();
+        flags |= PTEntryFlags::DIRTY;
+        flags &= !PTEntryFlags::WRITABLE;
+
+        let addr = entry.address();
+
+        // entry.address() returned with c-bit clear already
+        entry.set(make_private_address(addr), flags);
+    }
+
     /// Sets the shared state for a 4KB page.
     ///
     /// # Parameters
@@ -756,6 +769,26 @@ impl PageTable {
 
         if let Mapping::Level0(entry) = self.walk_addr(vaddr) {
             Self::make_pte_private(entry);
+            Ok(())
+        } else {
+            Err(SvsmError::Mem)
+        }
+    }
+
+    /// Mark a 4KiB page as a shadow stack page.
+    ///
+    /// # Parameters
+    /// - `vaddr`: The virtual address of the page.
+    ///
+    /// # Returns
+    /// A result indicating success or an error [`SvsmError`] if the
+    /// operation fails.
+    pub fn set_shadow_stack_4k(&mut self, vaddr: VirtAddr) -> Result<(), SvsmError> {
+        let mapping = self.walk_addr(vaddr);
+        Self::split_4k(mapping)?;
+
+        if let Mapping::Level0(entry) = self.walk_addr(vaddr) {
+            Self::make_pte_shadow_stack(entry);
             Ok(())
         } else {
             Err(SvsmError::Mem)

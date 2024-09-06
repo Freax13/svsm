@@ -7,6 +7,8 @@
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
+use svsm::cpu::shadow_stack;
+use svsm::enable2;
 use svsm::fw_meta::{print_fw_meta, validate_fw_memory, SevFWMetaData};
 
 use bootlib::kernel_launch::KernelLaunchInfo;
@@ -349,6 +351,8 @@ pub extern "C" fn svsm_start(li: &KernelLaunchInfo, vb_addr: usize) {
         .expect("Failed to run percpu.setup_on_cpu()");
     bsp_percpu.load();
 
+    enable2!(bsp_percpu);
+
     // Idle task must be allocated after PerCPU data is mapped
     bsp_percpu
         .setup_idle_task(svsm_main)
@@ -464,9 +468,15 @@ pub extern "C" fn svsm_main() {
     #[cfg(test)]
     crate::test_main();
 
-    if exec_user("/init").is_err() {
-        log::info!("Failed to launch /init");
+    if let Err(err) = exec_user("/init") {
+        log::info!("Failed to launch /init: {err:?}");
     }
+
+    // unsafe {
+    // core::arch::asm!("mov rsp, 0", "call [rax]");
+    // }
+    //
+    // todo!();
 
     request_loop();
 

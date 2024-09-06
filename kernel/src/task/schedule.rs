@@ -33,6 +33,7 @@ extern crate alloc;
 use super::INITIAL_TASK_ID;
 use super::{Task, TaskListAdapter, TaskPointer, TaskRunListAdapter};
 use crate::address::Address;
+use crate::cpu::msr::write_msr;
 use crate::cpu::percpu::{irq_nesting_count, this_cpu};
 use crate::cpu::IrqGuard;
 use crate::error::SvsmError;
@@ -348,6 +349,7 @@ pub fn schedule() {
         }
 
         this_cpu().set_tss_rsp0(next.stack_bounds.end());
+        write_msr(0x000006a4, next.exception_shadow_stack.bits() as u64);
 
         // Get task-pointers, consuming the Arcs and release their reference
         unsafe {
@@ -396,14 +398,91 @@ global_asm!(
         pushq   %r15
         pushq   %rsp
 
-        // Save the current stack pointer
+        // If `prev` is not null
         testq   %rsi, %rsi
         jz      1f
+
+        // Save the current stack pointer
         movq    %rsp, (%rsi)
+
+        // Save the current shadow stack pointer
+        rdssp   %rax
+        sub $8, %rax
+        movq    %rax, 8(%rsi)
+
+        // One interesting difference between the normal stack pointer and the
+        // shadow stack pointer is how they can be switched: For the normal
+        // stack pointer we just have to set RSP to a new value. This doesn't
+        // work for SSP (the shadow stack pointer) because there's no way to
+        // directly move a value into it. Instead we have use to the `rstorssp`
+        // instruction. The key difference between this instruction and a
+        // regular `mov` is that `rstorssp` expects a "shadow stack restore
+        // token" to be at the top of the new stack (this is just a special
+        // value that marks the top of a inactive shadow stack). This restore
+        // shadow stack token can be written by executing `saveprevssp` after
+        // switching to a new stack with `rstorssp`: `saveprevssp` atomically
+        // pops the stack token of the new shadow stack and pushes it on the
+        // previous shadow stack. This means that we have to execute both
+        // `rstorssp` and `saveprevssp` every time we want to switch the shadow
+        // stacks.
+        // There's one major problem though: `saveprevssp` needs to access both
+        // the previous and the new shadow stack, but we only map one shadow
+        // stack into each task's page tables. If the page tables only have
+        // access to one shadow stack, we can't execute `saveprevssp` and so we
+        // we can't place a "shadow stack restore token" on the previous shadow
+        // stack. If there's no "shadow stack restore token" on the previous
+        // shadow stack that means we can't later restore this shadow stack.
+        // We obviously want to do switch back to the shadow stack later though
+        // so we need a work-around: We place a second "shadow stack restore
+        // token" at a fixed address in both page tables. This allows us to do
+        // the following:
+        // 1. Switch to the shadow stack at the fixed address using `rstorssp`.
+        // 2. Transfer the "shadow stack restore token" from the shadow stack 
+        //    at the fixed address to the previous shadow stack by executing
+        //    `saveprevssp`.
+        // 3. Switch the page tables. This doesn't lead to problems with the
+        //    shadow stack because is mapped into both page tables.
+        // 4. Switch to the new shadow stack using `rstorssp`.
+        // 5. Transfer the "shadow stack restore token" from the new shadow
+        //    stack back to the shadow stacks at the fixed address by executing
+        //    `saveprevssp`.
+        // We just switched between two shadow stack tables in different page
+        // tables :)
+        // There's on remaining implementation detail: We talked about a
+        // "shadow stack at a fixed address" and this might sound like it
+        // requires us to map the same physical memory into both page tables,
+        // but that's not actually the case: We just need some memory with the
+        // correct flags in both page tables, the contents don't actually
+        // matter because we only ever use it to store the "shadow stack
+        // restore token". Notably because the "shadow stack restore token" is
+        // popped off by the `saveprevssp` instruction before the page table
+        // switch, the "shadow stack restore token" isn't even present during
+        // page table switch and so the content at the address also doesn't
+        // matter. All that we need is 8 bytes of available storage in both
+        // page tables.
+        // We use the last 8 bytes of the page containing the shadow stack.
+        // This works because the shadow stack for each task is mapped at the
+        // same location, so "the last 8 bytes of the page containing the
+        // shadow stack" is fixed in practice.
+        
+        // Switch to a shadow stack that's valid in both page tables and move
+        // the "shadow stack restore token" to the old shadow stack.
+        or $0xfff, %rax
+        sub $7, %rax
+        rstorssp (%rax)
+        saveprevssp
 
     1:
         // Switch to the new task state
+        
+        // Switch to the new task page tables
         mov     %rdx, %cr3
+
+        // Switch to the new task shadow stack and move the "shadow stack
+        // restore token" back.
+        mov     8(%rdi), %rdx
+        rstorssp (%rdx)
+        saveprevssp
 
         // Switch to the new task stack
         movq    (%rdi), %rsp
