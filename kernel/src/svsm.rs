@@ -7,8 +7,7 @@
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(not(test), no_main)]
 
-use svsm::cpu::shadow_stack;
-use svsm::enable2;
+use svsm::enable_shadow_stacks;
 use svsm::fw_meta::{print_fw_meta, validate_fw_memory, SevFWMetaData};
 
 use bootlib::kernel_launch::KernelLaunchInfo;
@@ -351,7 +350,7 @@ pub extern "C" fn svsm_start(li: &KernelLaunchInfo, vb_addr: usize) {
         .expect("Failed to run percpu.setup_on_cpu()");
     bsp_percpu.load();
 
-    enable2!(bsp_percpu);
+    enable_shadow_stacks!(bsp_percpu);
 
     // Idle task must be allocated after PerCPU data is mapped
     bsp_percpu
@@ -372,6 +371,9 @@ pub extern "C" fn svsm_start(li: &KernelLaunchInfo, vb_addr: usize) {
 
     let bp = this_cpu().get_top_of_stack();
     log::info!("BSP Runtime stack starts @ {:#018x}", bp);
+
+    let token_addr = this_cpu().get_top_of_shadow_stack();
+    log::info!("token_addr={token_addr:x}");
 
     platform
         .configure_alternate_injection(launch_info.use_alternate_injection)

@@ -659,6 +659,7 @@ impl PerCpu {
 
     pub fn setup_idle_task(&self, entry: extern "C" fn()) -> Result<(), SvsmError> {
         let idle_task = Task::create(self, entry)?;
+        log::info!("idle task {idle_task:p}");
         self.runqueue.lock_read().set_idle_task(idle_task);
         Ok(())
     }

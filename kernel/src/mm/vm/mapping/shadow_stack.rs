@@ -4,12 +4,7 @@ use crate::{
     address::{Address, PhysAddr, VirtAddr},
     cpu::shadow_stack,
     error::SvsmError,
-    mm::{
-        allocate_file_page_ref,
-        pagetable::PTEntryFlags,
-        vm::{Mapping, VirtualMapping},
-        PageRef, PAGE_SIZE,
-    },
+    mm::{allocate_file_page_ref, pagetable::PTEntryFlags, vm::VirtualMapping, PageRef, PAGE_SIZE},
 };
 
 #[derive(Debug)]

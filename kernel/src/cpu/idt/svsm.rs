@@ -214,11 +214,12 @@ extern "C" fn ex_handler_control_protection(ctxt: &mut X86ExceptionContext, _vec
     const FAR_RET_IRET: usize = 2;
     /// An RSTORSSP instruction encountered an invalid shadow stack restore
     /// token.
-    const RSTORSSP: usize = 3;
+    const RSTORSSP: usize = 4;
     /// A SETSSBSY instruction encountered an invalid supervisor shadow stack
     /// token.
-    const SETSSBSY: usize = 4;
+    const SETSSBSY: usize = 5;
 
+    let rip = ctxt.frame.rip;
     match ctxt.error_code & 0x7fff {
         code @ (NEAR_RET | FAR_RET_IRET) => {
             // Read the return address on the normal stack.
@@ -238,10 +239,20 @@ extern "C" fn ex_handler_control_protection(ctxt: &mut X86ExceptionContext, _vec
             panic!("thread tried to return to {ret:#x}, but return address on shadow stack was {ret_on_ssp:#x}!");
         }
         RSTORSSP => {
-            panic!("rstorssp instruction encountered an unexpected shadow stack restore token")
+            log::info!("{ctxt:x?}");
+
+            let value = unsafe { core::ptr::read(0xfffffe0000010ff8 as *const u64) };
+            log::info!("value={value:2x}");
+
+            panic!("rstorssp instruction encountered an unexpected shadow stack restore token at RIP {rip:#018x}");
         }
         SETSSBSY => {
-            panic!("setssbsy instruction encountered an unexpected supervisor shadow stack token")
+            log::info!("{ctxt:x?}");
+
+            let value = unsafe { core::ptr::read(0xfffffe0000010ff8 as *const u64) };
+            log::info!("value={value:2x}");
+
+            panic!("setssbsy instruction encountered an unexpected supervisor shadow stack token at RIP {rip:#018x}");
         }
         code => unreachable!("unexpected code for #CP exception: {code}"),
     }

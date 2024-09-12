@@ -1,38 +1,29 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-use core::{arch::asm, num::NonZeroUsize};
+use core::num::NonZeroUsize;
 
 use bitflags::bitflags;
 
 use crate::{
     address::{Address, VirtAddr},
-    cpu::{
-        control_regs::{write_cr4, CR4Flags},
-        percpu::this_cpu,
-    },
+    cpu::percpu::this_cpu,
     error::SvsmError,
     mm::PageBox,
 };
 
-use super::{control_regs::read_cr4, msr::read_msr};
+use super::msr::read_msr;
 
 pub const S_CET: u32 = 0x6a2;
 
 pub const MODE_64BIT: usize = 1;
 
 #[macro_export]
-macro_rules! enable2 {
+macro_rules! enable_shadow_stacks {
     ($bsp_percpu:ident) => {{
-        use core::{arch::asm, num::NonZeroUsize};
-
-        use bitflags::bitflags;
-
-        use crate::{
-            shadow_stack::{SCetFlags,S_CET, MODE_64BIT}
-        };
-        use svsm::address::Address;use svsm::cpu::control_regs::write_cr4;
-        use svsm::cpu::control_regs::CR4Flags;
-        use svsm::cpu::control_regs::read_cr4;
+        use core::arch::asm;
+        use svsm::address::Address;
+        use svsm::cpu::control_regs::{read_cr4, write_cr4, CR4Flags};
+        use svsm::cpu::shadow_stack::{SCetFlags, MODE_64BIT, S_CET};
 
         let token_addr = $bsp_percpu.get_top_of_shadow_stack();
 
@@ -42,23 +33,11 @@ macro_rules! enable2 {
         cr4 |= CR4Flags::CET;
         write_cr4(cr4);
 
-        // Read the return address to `svsm_start`. We need to put this address on
-        // the new shadow stack. Note that `svsm_start` itself never returns, so we
-        // don't need to put more return addresses on the shadow stack.
-        let mut rip: usize;
-        unsafe {
-            asm!(
-                "mov {}, [rbp + 8]",
-                out(reg) rip,
-            );
-        };
-
-        // Enable the shadow stack.
         unsafe {
             asm!(
                 // Enable shadow stacks.
                 "wrmsr",
-
+                // Write a shadow stack restore token onto the stack.
                 "wrssq [{token_addr}], {token_val}",
                 // Load the shadow stack.
                 "rstorssp [{token_addr}]",
@@ -72,8 +51,6 @@ macro_rules! enable2 {
         }
     }};
 }
-
-pub(crate) use enable2;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ShadowStackToken {
