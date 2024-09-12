@@ -16,6 +16,7 @@ pub mod irq_state;
 pub mod msr;
 pub mod percpu;
 pub mod registers;
+pub mod shadow_stack;
 pub mod smp;
 pub mod tlb;
 pub mod tss;
