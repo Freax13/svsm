@@ -29,6 +29,13 @@ HV_DOORBELL_ADDR:
         pushq   %r13
         pushq   %r14
         pushq   %r15
+		pushq   $0
+		.if CFG_SHADOW_STACKS
+		rdsspq  %rax
+		.else
+		xor %rax, %rax
+		.endif
+		push    %rax
 .endm
 
 .macro default_entry_no_ist name: req handler:req error_code:req vector:req
@@ -199,6 +206,13 @@ continue_hv:
         pushq   %r13
         pushq   %r14
         pushq   %r15
+		pushq   $0
+		.if CFG_SHADOW_STACKS
+		rdsspq  %rdx
+		.else
+		xor %rax, %rax
+		.endif
+		push    %rdx
 	// Load the address of the #HV doorbell page.  The global address
 	// might not yet be configured, and the per-CPU page might also not
 	// yet be configured, so only process events if there is a valid
@@ -222,13 +236,13 @@ return_new_task:
 default_return:
 	// Ensure that interrupts are disabled before attempting any return.
 	cli
-	testb	$3, 17*8(%rsp) // Check CS in exception frame
+	testb	$3, 19*8(%rsp) // Check CS in exception frame
 	jnz 	return_user
 return_all_paths:
 	// If interrupts were prerviously available, then check whether any #HV
 	// events are pending.  If so, proceed as if the original trap was
 	// #HV.
-	testl 	$0x200, 18*8(%rsp) // check EFLAGS.IF in exception frame
+	testl 	$0x200, 20*8(%rsp) // check EFLAGS.IF in exception frame
 	jz 	begin_iret_return
 	movq 	HV_DOORBELL_ADDR(%rip), %rdi
 	test 	%rdi, %rdi
@@ -248,23 +262,23 @@ iret_return_window:
 begin_iret_return:
 	// Reload registers without modifying the stack pointer so that if #HV
 	// occurs within this window, the saved registers are still intact.
-	movq 	0*8(%rsp), %r15
-	movq 	1*8(%rsp), %r14
-	movq 	2*8(%rsp), %r13
-	movq 	3*8(%rsp), %r12
-	movq 	4*8(%rsp), %r11
-	movq 	5*8(%rsp), %r10
-	movq 	6*8(%rsp), %r9
-	movq 	7*8(%rsp), %r8
-	movq 	8*8(%rsp), %rbp
-	movq 	9*8(%rsp), %rdi
-	movq 	10*8(%rsp), %rsi
-	movq 	11*8(%rsp), %rdx
-	movq 	12*8(%rsp), %rcx
-	movq 	13*8(%rsp), %rbx
-	movq 	14*8(%rsp), %rax
+	movq 	2*8(%rsp), %r15
+	movq 	3*8(%rsp), %r14
+	movq 	4*8(%rsp), %r13
+	movq 	5*8(%rsp), %r12
+	movq 	6*8(%rsp), %r11
+	movq 	7*8(%rsp), %r10
+	movq 	8*8(%rsp), %r9
+	movq 	9*8(%rsp), %r8
+	movq 	10*8(%rsp), %rbp
+	movq 	11*8(%rsp), %rdi
+	movq 	12*8(%rsp), %rsi
+	movq 	13*8(%rsp), %rdx
+	movq 	14*8(%rsp), %rcx
+	movq 	15*8(%rsp), %rbx
+	movq 	16*8(%rsp), %rax
 
-	addq 	$16*8, %rsp
+	addq 	$18*8, %rsp
 
 default_iret:
 	iretq
