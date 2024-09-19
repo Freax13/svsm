@@ -14,6 +14,7 @@ use crate::cpu::tss::TSS_LIMIT;
 use crate::cpu::vmsa::{init_guest_vmsa, init_svsm_vmsa};
 use crate::cpu::{IrqState, LocalApic};
 use crate::error::{ApicError, SvsmError};
+use crate::locking::OnceLock;
 use crate::locking::{LockGuard, RWLock, RWLockIrqSafe, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::virtualrange::VirtualRange;
@@ -34,7 +35,7 @@ use crate::types::{PAGE_SHIFT, PAGE_SHIFT_2M, PAGE_SIZE, PAGE_SIZE_2M, SVSM_TR_F
 use crate::utils::MemoryRegion;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::cell::{Cell, OnceCell, Ref, RefCell, RefMut, UnsafeCell};
+use core::cell::{Cell, OnceCell, Ref, RefCell, RefMut};
 use core::mem::size_of;
 use core::ptr;
 use core::slice::Iter;
@@ -48,7 +49,7 @@ pub struct PerCpuInfo {
 }
 
 impl PerCpuInfo {
-    const fn new(apic_id: u32, cpu_shared: &'static PerCpuShared) -> Self {
+    pub const fn new(apic_id: u32, cpu_shared: &'static PerCpuShared) -> Self {
         Self {
             apic_id,
             cpu_shared,
@@ -63,43 +64,31 @@ impl PerCpuInfo {
 // PERCPU areas virtual addresses into shared memory
 pub static PERCPU_AREAS: PerCpuAreas = PerCpuAreas::new();
 
-// We use an UnsafeCell to allow for a static with interior
-// mutability. Normally, we would need to guarantee synchronization
-// on the backing datatype, but this is not needed because writes to
-// the structure only occur at initialization, from CPU 0, and reads
-// should only occur after all writes are done.
 #[derive(Debug)]
 pub struct PerCpuAreas {
-    areas: UnsafeCell<Vec<PerCpuInfo>>,
+    areas: OnceLock<Vec<PerCpuInfo>>,
 }
-
-unsafe impl Sync for PerCpuAreas {}
 
 impl PerCpuAreas {
     const fn new() -> Self {
         Self {
-            areas: UnsafeCell::new(Vec::new()),
+            areas: OnceLock::new(),
         }
     }
 
-    unsafe fn push(&self, info: PerCpuInfo) {
-        let ptr = self.areas.get().as_mut().unwrap();
-        ptr.push(info);
+    pub fn set(&self, areas: Vec<PerCpuInfo>) {
+        self.areas
+            .set(areas)
+            .expect("Failed to initialize shared PerCpu areas");
     }
 
     pub fn iter(&self) -> Iter<'_, PerCpuInfo> {
-        let ptr = unsafe { self.areas.get().as_ref().unwrap() };
-        ptr.iter()
+        self.areas.get().unwrap().iter()
     }
 
     // Fails if no such area exists or its address is NULL
     pub fn get(&self, apic_id: u32) -> Option<&'static PerCpuShared> {
-        // For this to not produce UB the only invariant we must
-        // uphold is that there are no mutations or mutable aliases
-        // going on when casting via as_ref(). This only happens via
-        // Self::push(), which is intentionally unsafe and private.
-        let ptr = unsafe { self.areas.get().as_ref().unwrap() };
-        ptr.iter()
+        self.iter()
             .find(|info| info.apic_id == apic_id)
             .map(|info| info.cpu_shared)
     }
@@ -353,7 +342,6 @@ impl PerCpu {
     pub fn alloc(apic_id: u32) -> Result<&'static Self, SvsmError> {
         let page = PageBox::try_new(Self::new(apic_id))?;
         let percpu = PageBox::leak(page);
-        unsafe { PERCPU_AREAS.push(PerCpuInfo::new(apic_id, &percpu.shared)) };
         Ok(percpu)
     }
 

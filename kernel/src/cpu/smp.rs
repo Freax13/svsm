@@ -4,34 +4,54 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
+extern crate alloc;
+
+use alloc::vec::Vec;
+use core::iter::once;
+
 use crate::acpi::tables::ACPICPUInfo;
-use crate::cpu::percpu::{this_cpu, this_cpu_shared, PerCpu};
-use crate::error::SvsmError;
+use crate::cpu::percpu::{this_cpu, this_cpu_shared, PerCpu, PerCpuInfo, PERCPU_AREAS};
 use crate::platform::SvsmPlatform;
 use crate::platform::SVSM_PLATFORM;
 use crate::requests::{request_loop, request_processing_main};
 use crate::task::{create_kernel_task, schedule_init};
 use crate::utils::immut_after_init::immut_after_init_set_multithreaded;
 
-fn start_cpu(platform: &dyn SvsmPlatform, apic_id: u32) -> Result<(), SvsmError> {
-    let start_rip: u64 = (start_ap as *const u8) as u64;
-    let percpu = PerCpu::alloc(apic_id)?;
-    platform.start_cpu(percpu, start_rip)?;
-
-    let percpu_shared = percpu.shared();
-    while !percpu_shared.is_online() {}
-    Ok(())
-}
-
 pub fn start_secondary_cpus(platform: &dyn SvsmPlatform, cpus: &[ACPICPUInfo]) {
     immut_after_init_set_multithreaded();
-    let mut count: usize = 0;
-    for c in cpus.iter().filter(|c| c.apic_id != 0 && c.enabled) {
-        log::info!("Launching AP with APIC-ID {}", c.apic_id);
-        start_cpu(platform, c.apic_id).expect("Failed to bring CPU online");
-        count += 1;
+
+    // Allocate PerCpu structs for all APs.
+    let per_cpus = cpus
+        .iter()
+        .filter(|c| c.apic_id != 0 && c.enabled)
+        .map(|c| PerCpu::alloc(c.apic_id))
+        .collect::<Result<Vec<_>, _>>()
+        .expect("Failed to allocate PerCpus");
+
+    // Collect all shared parts and make them globally available.
+    let per_cpu_shareds = once(PerCpuInfo::new(0, this_cpu_shared()))
+        .chain(
+            per_cpus
+                .iter()
+                .copied()
+                .map(|percpu| PerCpuInfo::new(percpu.get_apic_id(), percpu.shared())),
+        )
+        .collect();
+    PERCPU_AREAS.set(per_cpu_shareds);
+
+    // Launch the APs.
+    for percpu in per_cpus.iter() {
+        log::info!("Launching AP with APIC-ID {}", percpu.get_apic_id());
+
+        let start_rip: u64 = (start_ap as *const u8) as u64;
+        platform
+            .start_cpu(percpu, start_rip)
+            .expect("Failed to bring CPU online");
+
+        let percpu_shared = percpu.shared();
+        while !percpu_shared.is_online() {}
     }
-    log::info!("Brought {} AP(s) online", count);
+    log::info!("Brought {} AP(s) online", per_cpus.len());
 }
 
 #[no_mangle]
