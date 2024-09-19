@@ -5,10 +5,12 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 pub mod common;
+pub mod once_lock;
 pub mod rwlock;
 pub mod spinlock;
 
 pub use common::{IrqLocking, IrqSafeLocking, IrqUnsafeLocking};
+pub use once_lock::OnceLock;
 pub use rwlock::{
     RWLock, RWLockIrqSafe, ReadLockGuard, ReadLockGuardIrqSafe, WriteLockGuard,
     WriteLockGuardIrqSafe,
