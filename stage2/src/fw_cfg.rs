@@ -4,8 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-extern crate alloc;
-
 use crate::address::{Address, PhysAddr};
 use crate::error::SvsmError;
 use crate::mm::pagetable::max_phys_addr;
@@ -13,7 +11,6 @@ use crate::utils::MemoryRegion;
 
 use super::io::IOPort;
 use super::string::FixedString;
-use alloc::vec::Vec;
 use core::mem::size_of;
 
 const FW_CFG_CTL: u16 = 0x510;
@@ -156,29 +153,24 @@ impl<'a> FwCfg<'a> {
         MemoryRegion::from_addresses(start, end)
     }
 
-    pub fn get_memory_regions(&self) -> Result<Vec<MemoryRegion<PhysAddr>>, SvsmError> {
-        let mut regions = Vec::new();
+    pub fn get_memory_regions(
+        &self,
+    ) -> Result<impl Iterator<Item = MemoryRegion<PhysAddr>> + '_, SvsmError> {
         let file = self.file_selector("etc/e820")?;
         let entries = file.size / 20;
 
         self.select(file.selector);
 
-        for _ in 0..entries {
+        Ok((0..entries).filter_map(|_| {
             let region = self.read_memory_region();
             let t: u32 = self.read_le();
-
-            if t == 1 {
-                regions.push(region);
-            }
-        }
-
-        Ok(regions)
+            (t == 1).then_some(region)
+        }))
     }
 
     fn find_kernel_region_e820(&self) -> Result<MemoryRegion<PhysAddr>, SvsmError> {
         let regions = self.get_memory_regions()?;
         let kernel_region = regions
-            .iter()
             .max_by_key(|region| region.start())
             .ok_or(SvsmError::FwCfg(FwCfgError::KernelRegion))?;
 
