@@ -7,8 +7,59 @@
 #![no_std]
 #![no_main]
 
-pub mod boot_stage2;
+mod acpi;
+mod address;
+mod boot_stage2;
+mod config;
+mod console;
+mod cpu;
+mod crypto;
+mod debug;
+mod error;
+mod fs;
+mod fw_cfg;
+mod fw_meta;
+mod greq;
+mod igvm_params;
+mod insn_decode;
+mod io;
+mod kernel_region;
+mod locking;
+mod mm;
+mod platform;
+mod protocols;
+mod requests;
+mod serial;
+mod sev;
+mod string;
+mod svsm_console;
+mod svsm_paging;
+mod syscall;
+mod task;
+mod types;
+mod utils;
+#[cfg(all(feature = "mstpm", not(test)))]
+mod vtpm;
 
+use crate::address::{Address, PhysAddr, VirtAddr};
+use crate::config::SvsmConfig;
+use crate::console::install_console_logger;
+use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
+use crate::cpu::gdt;
+use crate::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
+use crate::cpu::percpu::{this_cpu, PerCpu};
+use crate::error::SvsmError;
+use crate::fw_cfg::FwCfg;
+use crate::igvm_params::IgvmParams;
+use crate::mm::alloc::{memory_info, print_memory_info, root_mem_init};
+use crate::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
+use crate::mm::validate::{
+    init_valid_bitmap_alloc, valid_bitmap_addr, valid_bitmap_set_valid_range,
+};
+use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange, SVSM_PERCPU_BASE};
+use crate::platform::{PageStateChangeOp, PageValidateOp, SvsmPlatform, SvsmPlatformCell};
+use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
+use crate::utils::{halt, is_aligned, MemoryRegion};
 use bootlib::kernel_launch::{KernelLaunchInfo, Stage2LaunchInfo};
 use bootlib::platform::SvsmPlatformType;
 use core::arch::asm;
@@ -17,25 +68,6 @@ use core::ptr::addr_of_mut;
 use core::slice;
 use cpuarch::snp_cpuid::SnpCpuidTable;
 use elf::ElfError;
-use stage2::address::{Address, PhysAddr, VirtAddr};
-use stage2::config::SvsmConfig;
-use stage2::console::install_console_logger;
-use stage2::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
-use stage2::cpu::gdt;
-use stage2::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
-use stage2::cpu::percpu::{this_cpu, PerCpu};
-use stage2::error::SvsmError;
-use stage2::fw_cfg::FwCfg;
-use stage2::igvm_params::IgvmParams;
-use stage2::mm::alloc::{memory_info, print_memory_info, root_mem_init};
-use stage2::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
-use stage2::mm::validate::{
-    init_valid_bitmap_alloc, valid_bitmap_addr, valid_bitmap_set_valid_range,
-};
-use stage2::mm::{init_kernel_mapping_info, FixedAddressMappingRange, SVSM_PERCPU_BASE};
-use stage2::platform::{PageStateChangeOp, PageValidateOp, SvsmPlatform, SvsmPlatformCell};
-use stage2::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
-use stage2::utils::{halt, is_aligned, MemoryRegion};
 
 extern "C" {
     static mut pgtable: PageTable;

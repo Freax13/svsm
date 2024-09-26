@@ -9,10 +9,6 @@ name = "stage2"
 path = "src/stage2.rs"
 test = false
 
-[lib]
-test = true
-doctest = true
-
 [dependencies]
 bootlib.workspace = true
 cpuarch.workspace = true
