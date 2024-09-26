@@ -124,11 +124,11 @@ bin/meta.bin: utils/gen_meta utils/print-meta bin
 	./utils/gen_meta $@
 
 bin/stage2.bin: bin
-	cargo build --manifest-path kernel/Cargo.toml ${CARGO_ARGS} --bin stage2
+	cargo build -p stage2 ${CARGO_ARGS}
 	objcopy -O binary ${STAGE2_ELF} $@
 
 bin/svsm-kernel.elf: bin
-	cargo build ${CARGO_ARGS} ${SVSM_ARGS} --bin svsm
+	cargo build -p svsm ${CARGO_ARGS} ${SVSM_ARGS}
 	objcopy -O elf64-x86-64 --strip-unneeded ${SVSM_KERNEL_ELF} $@
 
 bin/test-kernel.elf: bin
