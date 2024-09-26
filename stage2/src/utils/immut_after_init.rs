@@ -49,7 +49,7 @@ pub enum ImmutAfterInitError {
 /// A `ImmutAfterInitCell` may start out in unitialized state and can get
 /// initialized at runtime:
 /// ```
-/// # use svsm::utils::immut_after_init::ImmutAfterInitCell;
+/// # use stage2::utils::immut_after_init::ImmutAfterInitCell;
 /// static X: ImmutAfterInitCell<i32> = ImmutAfterInitCell::uninit();
 /// pub fn main() {
 ///     unsafe { X.init(&123) };
@@ -61,7 +61,7 @@ pub enum ImmutAfterInitError {
 /// `ImmutAfterInitCell`'s value may get reset after having been initialized
 /// already:
 /// ```
-/// # use svsm::utils::immut_after_init::ImmutAfterInitCell;
+/// # use stage2::utils::immut_after_init::ImmutAfterInitCell;
 /// static X: ImmutAfterInitCell<i32> = ImmutAfterInitCell::new(0);
 /// pub fn main() {
 ///     assert_eq!(*X, 0);
@@ -197,7 +197,7 @@ unsafe impl<T: Copy + Send + Sync> Sync for ImmutAfterInitCell<T> {}
 /// A `ImmutAfterInitRef` can be initialized to either point to a
 /// `ImmutAfterInitCell`'s contents,
 /// ```
-/// # use svsm::utils::immut_after_init::{ImmutAfterInitCell, ImmutAfterInitRef};
+/// # use stage2::utils::immut_after_init::{ImmutAfterInitCell, ImmutAfterInitRef};
 /// static X: ImmutAfterInitCell<i32> = ImmutAfterInitCell::uninit();
 /// static RX: ImmutAfterInitRef<'_, i32> = ImmutAfterInitRef::uninit();
 /// fn main() {
@@ -208,7 +208,7 @@ unsafe impl<T: Copy + Send + Sync> Sync for ImmutAfterInitCell<T> {}
 /// ```
 /// or to plain value directly:
 /// ```
-/// # use svsm::utils::immut_after_init::ImmutAfterInitRef;
+/// # use stage2::utils::immut_after_init::ImmutAfterInitRef;
 /// static X: i32 = 123;
 /// static RX: ImmutAfterInitRef<'_, i32> = ImmutAfterInitRef::uninit();
 /// fn main() {
@@ -220,7 +220,7 @@ unsafe impl<T: Copy + Send + Sync> Sync for ImmutAfterInitCell<T> {}
 /// Also, an `ImmutAfterInitRef` can be initialized by obtaining a reference
 /// from another `ImmutAfterInitRef`:
 /// ```
-/// # use svsm::utils::immut_after_init::ImmutAfterInitRef;
+/// # use stage2::utils::immut_after_init::ImmutAfterInitRef;
 /// static RX : ImmutAfterInitRef::<'static, i32> = ImmutAfterInitRef::uninit();
 //
 /// fn init_rx(r : ImmutAfterInitRef<'static, i32>) {

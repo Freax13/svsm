@@ -6,7 +6,7 @@
 
 use core::arch::global_asm;
 
-use svsm::{
+use stage2::{
     cpu::{
         efer::EFERFlags,
         msr::{EFER, SEV_STATUS},

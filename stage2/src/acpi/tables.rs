@@ -433,9 +433,9 @@ pub struct ACPICPUInfo {
 /// # Example
 ///
 /// ```
-/// use svsm::acpi::tables::load_acpi_cpu_info;
-/// use svsm::fw_cfg::FwCfg;
-/// use svsm::io::IOPort;
+/// use stage2::acpi::tables::load_acpi_cpu_info;
+/// use stage2::fw_cfg::FwCfg;
+/// use stage2::io::IOPort;
 ///
 /// #[derive(Debug)]
 /// struct MyIo;

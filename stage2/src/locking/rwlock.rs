@@ -152,7 +152,7 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
     /// # Example
     ///
     /// ```rust
-    /// use svsm::locking::RWLock;
+    /// use stage2::locking::RWLock;
     ///
     /// #[derive(Debug)]
     /// struct MyData {

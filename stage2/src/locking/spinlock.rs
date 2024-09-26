@@ -17,7 +17,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 /// # Examples
 ///
 /// ```
-/// use svsm::locking::SpinLock;
+/// use stage2::locking::SpinLock;
 ///
 /// let data = 42;
 /// let spin_lock = SpinLock::new(data);
@@ -78,7 +78,7 @@ pub type LockGuardIrqSafe<'a, T> = RawLockGuard<'a, T, IrqSafeLocking>;
 /// # Examples
 ///
 /// ```
-/// use svsm::locking::SpinLock;
+/// use stage2::locking::SpinLock;
 ///
 /// let data = 42;
 /// let spin_lock = SpinLock::new(data);
@@ -120,7 +120,7 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
     /// # Examples
     ///
     /// ```
-    /// use svsm::locking::SpinLock;
+    /// use stage2::locking::SpinLock;
     ///
     /// let data = 42;
     /// let spin_lock = SpinLock::new(data);
@@ -139,7 +139,7 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
     /// # Examples
     ///
     /// ```
-    /// use svsm::locking::SpinLock;
+    /// use stage2::locking::SpinLock;
     ///
     /// let spin_lock = SpinLock::new(42);
     ///
