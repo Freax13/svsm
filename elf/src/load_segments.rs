@@ -6,23 +6,28 @@
 //
 // vim: ts=4 sw=4 et
 
-extern crate alloc;
-
 use super::types::*;
 use super::Elf64AddrRange;
 use super::Elf64File;
 use super::Elf64FileRange;
 use super::Elf64PhdrFlags;
 use super::ElfError;
-use alloc::vec::Vec;
 
 use core::cmp;
 
 /// Represents a collection of ELF64 load segments, each associated with an
 /// address range and a program header index.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Elf64LoadSegments {
-    segments: Vec<(Elf64AddrRange, Elf64Half)>,
+    // segmentsa: Vec<(Elf64AddrRange, Elf64Half)>,
+    segmentsa: [(Elf64AddrRange, Elf64Half); 64],
+    len: usize,
+}
+
+impl Default for Elf64LoadSegments {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Elf64LoadSegments {
@@ -32,8 +37,21 @@ impl Elf64LoadSegments {
     /// Returns a new [`Elf64LoadSegments`] with no segments.
     pub fn new() -> Self {
         Self {
-            segments: Vec::new(),
+            segmentsa: [const {
+                (
+                    Elf64AddrRange {
+                        vaddr_begin: 0,
+                        vaddr_end: 0,
+                    },
+                    0,
+                )
+            }; 64],
+            len: 0,
         }
+    }
+
+    fn segments(&self) -> &[(Elf64AddrRange, Elf64Half)] {
+        &self.segmentsa[..self.len]
     }
 
     /// Finds the index of the first load segment whose address range does not come before
@@ -46,11 +64,11 @@ impl Elf64LoadSegments {
     /// Returns [`Some(index)`] if a matching segment is found, where `index` is the index
     /// of the first such segment. Returns [`None`] if no matching segment is found.
     pub fn find_first_not_before(&self, range: &Elf64AddrRange) -> Option<usize> {
-        let i = self.segments.partition_point(|segment| {
+        let i = self.segments().partition_point(|segment| {
             matches!(segment.0.partial_cmp(range), Some(cmp::Ordering::Less))
         });
 
-        if i != self.segments.len() {
+        if i != self.len {
             Some(i)
         } else {
             None
@@ -77,17 +95,20 @@ impl Elf64LoadSegments {
         let i = self.find_first_not_before(&segment);
         match i {
             Some(i) => {
-                match segment.partial_cmp(&self.segments[i].0) {
+                match segment.partial_cmp(&self.segments()[i].0) {
                     Some(cmp::Ordering::Less) => {
                         // Ok, no overlap.
-                        self.segments.insert(i, (segment, phdr_index));
+                        self.segmentsa[i..self.len].rotate_right(1);
+                        self.segmentsa[i] = (segment, phdr_index);
+                        self.len += 1;
                         Ok(())
                     }
                     _ => Err(ElfError::LoadSegmentConflict),
                 }
             }
             None => {
-                self.segments.push((segment, phdr_index));
+                self.segmentsa[self.len] = (segment, phdr_index);
+                self.len += 1;
                 Ok(())
             }
         }
@@ -109,7 +130,7 @@ impl Elf64LoadSegments {
             None => return None,
         };
 
-        let segment = &self.segments[i];
+        let segment = &self.segments()[i];
         if segment.0.vaddr_begin <= range.vaddr_begin && range.vaddr_end <= segment.0.vaddr_end {
             let offset_in_segment = range.vaddr_begin - segment.0.vaddr_begin;
             Some((segment.1, offset_in_segment))
@@ -126,8 +147,11 @@ impl Elf64LoadSegments {
     /// to 0.
     pub fn total_vaddr_range(&self) -> Elf64AddrRange {
         Elf64AddrRange {
-            vaddr_begin: self.segments.first().map_or(0, |first| first.0.vaddr_begin),
-            vaddr_end: self.segments.last().map_or(0, |last| last.0.vaddr_end),
+            vaddr_begin: self
+                .segments()
+                .first()
+                .map_or(0, |first| first.0.vaddr_begin),
+            vaddr_end: self.segments().last().map_or(0, |last| last.0.vaddr_end),
         }
     }
 }
@@ -174,13 +198,13 @@ impl<'a> Iterator for Elf64ImageLoadSegmentIterator<'a> {
     /// - [`None`] if all segments have been processed.
     fn next(&mut self) -> Option<Self::Item> {
         let cur = self.next;
-        if cur == self.elf_file.load_segments.segments.len() {
+        if cur == self.elf_file.load_segments.len {
             return None;
         }
         self.next += 1;
 
         // Retrieve the program header (phdr) associated with the current segment
-        let phdr_index = self.elf_file.load_segments.segments[cur].1;
+        let phdr_index = self.elf_file.load_segments.segments()[cur].1;
         let phdr = self.elf_file.read_phdr(phdr_index);
 
         // Calculate the virtual address (vaddr) range based on the phdr information and load base
