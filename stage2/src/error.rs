@@ -25,7 +25,6 @@ use crate::sev::ghcb::GhcbError;
 use crate::sev::msr_protocol::GhcbMsrError;
 use crate::sev::SevSnpError;
 use elf::ElfError;
-use syscall::SysCallError;
 
 /// Errors related to APIC handling.  These may originate from multiple
 /// layers in the system.
