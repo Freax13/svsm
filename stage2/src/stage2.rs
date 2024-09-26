@@ -17,25 +17,25 @@ use core::ptr::addr_of_mut;
 use core::slice;
 use cpuarch::snp_cpuid::SnpCpuidTable;
 use elf::ElfError;
-use svsm::address::{Address, PhysAddr, VirtAddr};
-use svsm::config::SvsmConfig;
-use svsm::console::install_console_logger;
-use svsm::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
-use svsm::cpu::gdt;
-use svsm::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
-use svsm::cpu::percpu::{this_cpu, PerCpu};
-use svsm::error::SvsmError;
-use svsm::fw_cfg::FwCfg;
-use svsm::igvm_params::IgvmParams;
-use svsm::mm::alloc::{memory_info, print_memory_info, root_mem_init};
-use svsm::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
-use svsm::mm::validate::{
+use stage2::address::{Address, PhysAddr, VirtAddr};
+use stage2::config::SvsmConfig;
+use stage2::console::install_console_logger;
+use stage2::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
+use stage2::cpu::gdt;
+use stage2::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
+use stage2::cpu::percpu::{this_cpu, PerCpu};
+use stage2::error::SvsmError;
+use stage2::fw_cfg::FwCfg;
+use stage2::igvm_params::IgvmParams;
+use stage2::mm::alloc::{memory_info, print_memory_info, root_mem_init};
+use stage2::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
+use stage2::mm::validate::{
     init_valid_bitmap_alloc, valid_bitmap_addr, valid_bitmap_set_valid_range,
 };
-use svsm::mm::{init_kernel_mapping_info, FixedAddressMappingRange, SVSM_PERCPU_BASE};
-use svsm::platform::{PageStateChangeOp, PageValidateOp, SvsmPlatform, SvsmPlatformCell};
-use svsm::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
-use svsm::utils::{halt, is_aligned, MemoryRegion};
+use stage2::mm::{init_kernel_mapping_info, FixedAddressMappingRange, SVSM_PERCPU_BASE};
+use stage2::platform::{PageStateChangeOp, PageValidateOp, SvsmPlatform, SvsmPlatformCell};
+use stage2::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
+use stage2::utils::{halt, is_aligned, MemoryRegion};
 
 extern "C" {
     static mut pgtable: PageTable;

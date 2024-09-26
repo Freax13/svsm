@@ -20,9 +20,9 @@ use core::ptr::NonNull;
 /// Constructing a [`PageBox`] is very similar to constructing a regular `Box`:
 ///
 /// ```no_run
-/// # use svsm::mm::PageBox;
+/// # use stage2::mm::PageBox;
 /// let p = PageBox::try_new([0u8; 4096])?;
-/// # Ok::<(), svsm::error::SvsmError>(())
+/// # Ok::<(), stage2::error::SvsmError>(())
 /// ```
 ///
 /// The type guarantees that the allocated memory will have a minimum alignment
@@ -34,9 +34,9 @@ use core::ptr::NonNull;
 /// will not build because its size exceeds the maximum page order:
 ///
 /// ```compile_fail
-/// # use svsm::mm::PageBox;
+/// # use crate::mm::PageBox;
 /// let p = PageBox::try_new([0u8; 0x80000])?;
-/// # Ok::<(), svsm::error::SvsmError>(())
+/// # Ok::<(), crate::error::SvsmError>(())
 /// ```
 #[derive(Debug)]
 #[repr(transparent)]

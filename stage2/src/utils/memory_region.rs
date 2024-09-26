@@ -30,9 +30,9 @@ where
     /// Create a new memory region with overflow checks.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let start = VirtAddr::from(u64::MAX);
     /// let region = MemoryRegion::checked_new(start, PAGE_SIZE);
     /// assert!(region.is_none());
@@ -64,8 +64,8 @@ where
     /// Returns whether the region spans any actual memory.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::utils::MemoryRegion;
     /// let r = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), 0);
     /// assert!(r.is_empty());
     /// ```
@@ -77,9 +77,9 @@ where
     /// The end address of the memory region.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let base = VirtAddr::from(0xffffff0000u64);
     /// let region = MemoryRegion::new(base, PAGE_SIZE);
     /// assert_eq!(region.end(), VirtAddr::from(0xffffff1000u64));
@@ -93,27 +93,27 @@ where
     /// regions, use [`MemoryRegion::contiguous()`] for that purpose.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let r1 = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// let r2 = MemoryRegion::new(VirtAddr::from(0xffffff2000u64), PAGE_SIZE);
     /// assert!(!r1.overlap(&r2));
     /// ```
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let r1 = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE * 2);
     /// let r2 = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE);
     /// assert!(r1.overlap(&r2));
     /// ```
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// // Contiguous regions do not overlap
     /// let r1 = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// let r2 = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE);
@@ -127,18 +127,18 @@ where
     /// less strict check than [`MemoryRegion::overlap()`].
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let r1 = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// let r2 = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE);
     /// assert!(r1.contiguous(&r2));
     /// ```
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let r1 = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// let r2 = MemoryRegion::new(VirtAddr::from(0xffffff2000u64), PAGE_SIZE);
     /// assert!(!r1.contiguous(&r2));
@@ -152,9 +152,9 @@ where
     /// any non-overlapping memory between both.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let r1 = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// let r2 = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE);
     /// let r3 = r1.merge(&r2);
@@ -173,9 +173,9 @@ where
     /// page aligned, returned addresses will not be aligned either.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::{PAGE_SIZE, PageSize};
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::{PAGE_SIZE, PageSize};
+    /// # use stage2::utils::MemoryRegion;
     /// let region = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE * 2);
     /// let mut iter = region.iter_pages(PageSize::Regular);
     /// assert_eq!(iter.next(), Some(VirtAddr::from(0xffffff0000u64)));
@@ -192,9 +192,9 @@ where
     /// Check whether an address is within this region.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::{PAGE_SIZE, PageSize};
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::{PAGE_SIZE, PageSize};
+    /// # use stage2::utils::MemoryRegion;
     /// let region = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// assert!(region.contains(VirtAddr::from(0xffffff0000u64)));
     /// assert!(region.contains(VirtAddr::from(0xffffff0fffu64)));
@@ -208,9 +208,9 @@ where
     /// of the region.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::{PAGE_SIZE, PageSize};
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::{PAGE_SIZE, PageSize};
+    /// # use stage2::utils::MemoryRegion;
     /// let region = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE);
     /// assert!(region.contains_inclusive(VirtAddr::from(0xffffff0000u64)));
     /// assert!(region.contains_inclusive(VirtAddr::from(0xffffff0fffu64)));
@@ -224,9 +224,9 @@ where
     /// Check whether this region fully contains a different region.
     ///
     /// ```rust
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::utils::MemoryRegion;
-    /// # use svsm::types::PAGE_SIZE;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::utils::MemoryRegion;
+    /// # use stage2::types::PAGE_SIZE;
     /// let big = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE * 2);
     /// let small = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE);
     /// let overlapping = MemoryRegion::new(VirtAddr::from(0xffffff0000u64), PAGE_SIZE * 2);
@@ -242,9 +242,9 @@ where
     /// Returns a new memory region with the specified added length at the end.
     ///
     /// ```
-    /// # use svsm::address::VirtAddr;
-    /// # use svsm::types::PAGE_SIZE;
-    /// # use svsm::utils::MemoryRegion;
+    /// # use stage2::address::VirtAddr;
+    /// # use stage2::types::PAGE_SIZE;
+    /// # use stage2::utils::MemoryRegion;
     /// let region = MemoryRegion::new(VirtAddr::from(0xffffff1000u64), PAGE_SIZE);
     /// let bigger = region.expand(PAGE_SIZE);
     /// assert_eq!(bigger.len(), PAGE_SIZE * 2);
