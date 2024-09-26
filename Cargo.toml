@@ -6,6 +6,7 @@ members = [
     "igvmmeasure",
     # binary targets
     "kernel",
+    "stage2",
     # fuzzing
     "fuzz",
     # ELF loader
