@@ -8,7 +8,6 @@ use crate::address::{Address, PhysAddr};
 use crate::cpu::msr::{read_msr, write_msr, SEV_GHCB};
 use crate::error::SvsmError;
 use crate::utils::halt;
-use crate::utils::immut_after_init::ImmutAfterInitCell;
 
 use super::utils::raw_vmgexit;
 
@@ -67,8 +66,6 @@ impl Display for GHCBHvFeatures {
     }
 }
 
-static GHCB_HV_FEATURES: ImmutAfterInitCell<GHCBHvFeatures> = ImmutAfterInitCell::uninit();
-
 /// Check that we support the hypervisor's advertised GHCB versions.
 pub fn verify_ghcb_version() {
     // Request SEV information.
@@ -93,41 +90,6 @@ pub fn verify_ghcb_version() {
         (min_version..=max_version).contains(&2),
         "the hypervisor doesn't support GHCB version 2 (min: {min_version}, max: {max_version})"
     );
-}
-
-pub fn hypervisor_ghcb_features() -> GHCBHvFeatures {
-    *GHCB_HV_FEATURES
-}
-
-pub fn init_hypervisor_ghcb_features() -> Result<(), GhcbMsrError> {
-    write_msr(SEV_GHCB, GHCBMsr::SNP_HV_FEATURES_REQ);
-    raw_vmgexit();
-    let result = read_msr(SEV_GHCB);
-    if (result & 0xFFF) == GHCBMsr::SNP_HV_FEATURES_RESP {
-        let features = GHCBHvFeatures::from_bits_truncate(result >> 12);
-
-        // Verify that the required features are supported.
-        let required = GHCBHvFeatures::SEV_SNP
-            | GHCBHvFeatures::SEV_SNP_AP_CREATION
-            | GHCBHvFeatures::SEV_SNP_MULTI_VMPL;
-        let missing = !features & required;
-        if !missing.is_empty() {
-            log::error!(
-                "Required hypervisor GHCB features not available: present={:#x}, required={:#x}, missing={:#x}",
-                features, required, missing
-            );
-            // FIXME - enforce this panic once KVM advertises the required
-            // features.
-            // panic!("Required hypervisor GHCB features not available");
-        }
-
-        GHCB_HV_FEATURES
-            .init(&features)
-            .expect("Already initialized GHCB HV features");
-        Ok(())
-    } else {
-        Err(GhcbMsrError::InfoMismatch)
-    }
 }
 
 pub fn register_ghcb_gpa_msr(addr: PhysAddr) -> Result<(), GhcbMsrError> {

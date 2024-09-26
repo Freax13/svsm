@@ -7,7 +7,6 @@
 use crate::address::{PhysAddr, VirtAddr};
 use crate::console::init_console;
 use crate::cpu::cpuid::CpuidResult;
-use crate::cpu::msr::write_msr;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::IOPort;
@@ -23,8 +22,6 @@ use crate::mm::virt_to_phys;
 
 static CONSOLE_IO: NativeIOPort = NativeIOPort::new();
 static CONSOLE_SERIAL: ImmutAfterInitCell<SerialPort<'_>> = ImmutAfterInitCell::uninit();
-
-const APIC_MSR_ICR: u32 = 0x830;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NativePlatform {}
@@ -56,18 +53,6 @@ impl SvsmPlatform for NativePlatform {
         Ok(())
     }
 
-    fn env_setup_svsm(&self) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn setup_percpu(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn setup_percpu_current(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks {
         // Find physical address size.
         let res = CpuidResult::get(0x80000008, 0);
@@ -77,10 +62,6 @@ impl SvsmPlatform for NativePlatform {
             addr_mask_width: 64,
             phys_addr_sizes: res.eax,
         }
-    }
-
-    fn cpuid(&self, eax: u32) -> Option<CpuidResult> {
-        Some(CpuidResult::get(eax, 0))
     }
 
     fn setup_guest_host_comm(&mut self, _cpu: &PerCpu, _is_bsp: bool) {}
@@ -94,14 +75,6 @@ impl SvsmPlatform for NativePlatform {
         _region: MemoryRegion<PhysAddr>,
         _size: PageSize,
         _op: PageStateChangeOp,
-    ) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn validate_physical_page_range(
-        &self,
-        _region: MemoryRegion<PhysAddr>,
-        _op: PageValidateOp,
     ) -> Result<(), SvsmError> {
         Ok(())
     }
@@ -124,30 +97,5 @@ impl SvsmPlatform for NativePlatform {
             }
         }
         Ok(())
-    }
-
-    fn configure_alternate_injection(&mut self, _alt_inj_requested: bool) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn change_apic_registration_state(&self, _incr: bool) -> Result<bool, SvsmError> {
-        Err(SvsmError::NotSupported)
-    }
-
-    fn query_apic_registration_state(&self) -> bool {
-        false
-    }
-
-    fn post_irq(&self, icr: u64) -> Result<(), SvsmError> {
-        write_msr(APIC_MSR_ICR, icr);
-        Ok(())
-    }
-
-    fn eoi(&self) {
-        todo!();
-    }
-
-    fn start_cpu(&self, _cpu: &PerCpu, _start_rip: u64) -> Result<(), SvsmError> {
-        todo!();
     }
 }

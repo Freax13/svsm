@@ -41,7 +41,6 @@ impl<T, I> Deref for RawReadLockGuard<'_, T, I> {
 }
 
 pub type ReadLockGuard<'a, T> = RawReadLockGuard<'a, T, IrqUnsafeLocking>;
-pub type ReadLockGuardIrqSafe<'a, T> = RawReadLockGuard<'a, T, IrqSafeLocking>;
 
 /// A guard that provides exclusive write access to the data protected by [`RWLock`]
 #[derive(Debug)]
@@ -81,7 +80,6 @@ impl<T, I> DerefMut for RawWriteLockGuard<'_, T, I> {
 }
 
 pub type WriteLockGuard<'a, T> = RawWriteLockGuard<'a, T, IrqUnsafeLocking>;
-pub type WriteLockGuardIrqSafe<'a, T> = RawWriteLockGuard<'a, T, IrqSafeLocking>;
 
 /// A simple Read-Write Lock (RWLock) that allows multiple readers or
 /// one exclusive writer.
@@ -277,7 +275,6 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
 }
 
 pub type RWLock<T> = RawRWLock<T, IrqUnsafeLocking>;
-pub type RWLockIrqSafe<T> = RawRWLock<T, IrqSafeLocking>;
 
 mod tests {
     #[test]
@@ -324,71 +321,5 @@ mod tests {
 
         drop(read_guard1);
         drop(read_guard2);
-    }
-
-    #[test]
-    #[cfg_attr(not(test_in_svsm), ignore = "Can only be run inside guest")]
-    fn rw_lock_irq_unsafe() {
-        use crate::cpu::irq_state::{raw_irqs_disable, raw_irqs_enable};
-        use crate::cpu::{irqs_disabled, irqs_enabled};
-        use crate::locking::*;
-
-        assert!(irqs_disabled());
-        unsafe {
-            raw_irqs_enable();
-            let lock = RWLock::new(0);
-
-            // Lock for write
-            let guard = lock.lock_write();
-            // IRQs must still be enabled;
-            assert!(irqs_enabled());
-            // Unlock
-            drop(guard);
-
-            // Lock for read
-            let guard = lock.lock_read();
-            // IRQs must still be enabled;
-            assert!(irqs_enabled());
-            // Unlock
-            drop(guard);
-
-            // IRQs must still be enabled
-            assert!(irqs_enabled());
-            raw_irqs_disable();
-        }
-    }
-
-    #[test]
-    #[cfg_attr(not(test_in_svsm), ignore = "Can only be run inside guest")]
-    fn rw_lock_irq_safe() {
-        use crate::cpu::irq_state::{raw_irqs_disable, raw_irqs_enable};
-        use crate::cpu::{irqs_disabled, irqs_enabled};
-        use crate::locking::*;
-
-        assert!(irqs_disabled());
-        unsafe {
-            raw_irqs_enable();
-            let lock = RWLockIrqSafe::new(0);
-
-            // Lock for write
-            let guard = lock.lock_write();
-            // IRQs must be disabled
-            assert!(irqs_disabled());
-            // Unlock
-            drop(guard);
-
-            assert!(irqs_enabled());
-
-            // Lock for read
-            let guard = lock.lock_read();
-            // IRQs must still be enabled;
-            assert!(irqs_disabled());
-            // Unlock
-            drop(guard);
-
-            // IRQs must still be enabled
-            assert!(irqs_enabled());
-            raw_irqs_disable();
-        }
     }
 }

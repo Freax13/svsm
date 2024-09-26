@@ -63,9 +63,6 @@ impl<T, I> DerefMut for RawLockGuard<'_, T, I> {
     }
 }
 
-pub type LockGuard<'a, T> = RawLockGuard<'a, T, IrqUnsafeLocking>;
-pub type LockGuardIrqSafe<'a, T> = RawLockGuard<'a, T, IrqSafeLocking>;
-
 /// A simple ticket-spinlock implementation for protecting concurrent data
 /// access.
 ///
@@ -198,7 +195,6 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
 }
 
 pub type SpinLock<T> = RawSpinLock<T, IrqUnsafeLocking>;
-pub type SpinLockIrqSafe<T> = RawSpinLock<T, IrqSafeLocking>;
 
 #[cfg(test)]
 mod tests {

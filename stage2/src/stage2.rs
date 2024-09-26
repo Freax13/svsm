@@ -7,39 +7,26 @@
 #![no_std]
 #![no_main]
 
-mod acpi;
 mod address;
 mod boot_stage2;
 mod config;
 mod console;
 mod cpu;
-mod crypto;
-mod debug;
 mod error;
-mod fs;
 mod fw_cfg;
 mod fw_meta;
-mod greq;
 mod igvm_params;
 mod insn_decode;
 mod io;
-mod kernel_region;
 mod locking;
 mod mm;
 mod platform;
-mod protocols;
-mod requests;
 mod serial;
 mod sev;
 mod string;
 mod svsm_console;
-mod svsm_paging;
-mod syscall;
-mod task;
 mod types;
 mod utils;
-#[cfg(all(feature = "mstpm", not(test)))]
-mod vtpm;
 
 use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::config::SvsmConfig;
@@ -83,7 +70,7 @@ fn setup_stage2_allocator(heap_start: u64, heap_end: u64) {
 }
 
 fn init_percpu(platform: &mut dyn SvsmPlatform) -> Result<(), SvsmError> {
-    let bsp_percpu = PerCpu::alloc(0)?;
+    let bsp_percpu = PerCpu::alloc()?;
     let init_pgtable = unsafe {
         // SAFETY: pgtable is a static mut and this is the only place where we
         // get a reference to it.

@@ -8,11 +8,9 @@ use crate::address::{Address, PhysAddr};
 use crate::error::SvsmError;
 use crate::locking::SpinLock;
 use crate::mm::{virt_to_phys, PageBox};
-use crate::types::{PAGE_SIZE, PAGE_SIZE_2M};
+use crate::types::PAGE_SIZE;
 use crate::utils::MemoryRegion;
-use core::mem::MaybeUninit;
 use core::num::NonZeroUsize;
-use core::ptr::NonNull;
 
 static VALID_BITMAP: SpinLock<Option<ValidBitmap>> = SpinLock::new(None);
 
@@ -26,40 +24,12 @@ fn bitmap_elems(region: MemoryRegion<PhysAddr>) -> NonZeroUsize {
     .unwrap()
 }
 
-/// # Safety
-///
-/// The caller must ensure that the given bitmap pointer is valid.
-pub unsafe fn init_valid_bitmap_ptr(region: MemoryRegion<PhysAddr>, raw: NonNull<u64>) {
-    let len = bitmap_elems(region);
-    let ptr = NonNull::slice_from_raw_parts(raw, len.get());
-    let bitmap = unsafe { PageBox::from_raw(ptr) };
-    *VALID_BITMAP.lock() = Some(ValidBitmap::new(region, bitmap));
-}
-
 pub fn init_valid_bitmap_alloc(region: MemoryRegion<PhysAddr>) -> Result<(), SvsmError> {
     let len = bitmap_elems(region);
     let bitmap = PageBox::try_new_slice(0u64, len)?;
     *VALID_BITMAP.lock() = Some(ValidBitmap::new(region, bitmap));
 
     Ok(())
-}
-
-pub fn migrate_valid_bitmap() -> Result<(), SvsmError> {
-    let region = VALID_BITMAP.lock().as_ref().unwrap().region;
-    let len = bitmap_elems(region);
-    let bitmap = PageBox::try_new_uninit_slice(len)?;
-
-    // lock again here because allocator path also takes VALID_BITMAP.lock()
-    VALID_BITMAP.lock().as_mut().unwrap().migrate(bitmap);
-    Ok(())
-}
-
-pub fn validated_phys_addr(paddr: PhysAddr) -> bool {
-    VALID_BITMAP
-        .lock()
-        .as_ref()
-        .map(|vb| vb.is_valid_4k(paddr))
-        .unwrap_or(false)
 }
 
 pub fn valid_bitmap_set_valid_4k(paddr: PhysAddr) {
@@ -74,27 +44,9 @@ pub fn valid_bitmap_clear_valid_4k(paddr: PhysAddr) {
     }
 }
 
-pub fn valid_bitmap_set_valid_2m(paddr: PhysAddr) {
-    if let Some(vb) = VALID_BITMAP.lock().as_mut() {
-        vb.set_valid_2m(paddr);
-    }
-}
-
-pub fn valid_bitmap_clear_valid_2m(paddr: PhysAddr) {
-    if let Some(vb) = VALID_BITMAP.lock().as_mut() {
-        vb.clear_valid_2m(paddr);
-    }
-}
-
 pub fn valid_bitmap_set_valid_range(paddr_begin: PhysAddr, paddr_end: PhysAddr) {
     if let Some(vb) = VALID_BITMAP.lock().as_mut() {
         vb.set_valid_range(paddr_begin, paddr_end);
-    }
-}
-
-pub fn valid_bitmap_clear_valid_range(paddr_begin: PhysAddr, paddr_end: PhysAddr) {
-    if let Some(vb) = VALID_BITMAP.lock().as_mut() {
-        vb.clear_valid_range(paddr_begin, paddr_end);
     }
 }
 
@@ -138,17 +90,6 @@ impl ValidBitmap {
         (index, bit)
     }
 
-    fn migrate(&mut self, mut new: PageBox<[MaybeUninit<u64>]>) {
-        for (dst, src) in new
-            .iter_mut()
-            .zip(self.bitmap.iter().copied().chain(core::iter::repeat(0)))
-        {
-            dst.write(src);
-        }
-        // SAFETY: we initialized the contents of the whole slice
-        self.bitmap = unsafe { new.assume_init_slice() };
-    }
-
     fn set_valid_4k(&mut self, paddr: PhysAddr) {
         let (index, bit) = self.index(paddr);
 
@@ -165,24 +106,6 @@ impl ValidBitmap {
         assert!(self.check_addr(paddr));
 
         self.bitmap[index] &= !(1u64 << bit);
-    }
-
-    fn set_2m(&mut self, paddr: PhysAddr, val: u64) {
-        const NR_INDEX: usize = PAGE_SIZE_2M / (PAGE_SIZE * 64);
-        let (index, _) = self.index(paddr);
-
-        assert!(paddr.is_aligned(PAGE_SIZE_2M));
-        assert!(self.check_addr(paddr));
-
-        self.bitmap[index..index + NR_INDEX].fill(val);
-    }
-
-    fn set_valid_2m(&mut self, paddr: PhysAddr) {
-        self.set_2m(paddr, !0u64);
-    }
-
-    fn clear_valid_2m(&mut self, paddr: PhysAddr) {
-        self.set_2m(paddr, 0u64);
     }
 
     fn modify_bitmap_word(&mut self, index: usize, mask: u64, new_val: u64) {
@@ -217,18 +140,5 @@ impl ValidBitmap {
 
     fn set_valid_range(&mut self, paddr_begin: PhysAddr, paddr_end: PhysAddr) {
         self.set_range(paddr_begin, paddr_end, true);
-    }
-
-    fn clear_valid_range(&mut self, paddr_begin: PhysAddr, paddr_end: PhysAddr) {
-        self.set_range(paddr_begin, paddr_end, false);
-    }
-
-    fn is_valid_4k(&self, paddr: PhysAddr) -> bool {
-        let (index, bit) = self.index(paddr);
-
-        assert!(self.check_addr(paddr));
-
-        let mask: u64 = 1u64 << bit;
-        self.bitmap[index] & mask == mask
     }
 }

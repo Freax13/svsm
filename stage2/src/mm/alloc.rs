@@ -5,18 +5,13 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::address::{Address, PhysAddr, VirtAddr};
-use crate::cpu::mem::{copy_bytes, write_bytes};
 use crate::error::SvsmError;
 use crate::locking::SpinLock;
-use crate::mm::virt_to_phys;
 use crate::types::{PAGE_SHIFT, PAGE_SIZE};
-use crate::utils::{align_down, align_up, zero_mem_region};
+use crate::utils::{align_down, align_up};
 use core::alloc::{GlobalAlloc, Layout};
 use core::mem::size_of;
 use core::ptr;
-
-#[cfg(any(test, fuzzing))]
-use crate::locking::LockGuard;
 
 /// Represents possible errors that can occur during memory allocation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,8 +24,6 @@ pub enum AllocError {
     OutOfMemory,
     /// The specified page order is invalid.
     InvalidPageOrder(usize),
-    /// The file page has an invalid virtual address.
-    InvalidFilePage(VirtAddr),
     /// The page frame number (PFN) is invalid.
     InvalidPfn(usize),
 }
@@ -301,11 +294,6 @@ struct FileInfo {
 }
 
 impl FileInfo {
-    /// Creates a new [`FileInfo`] with the specified reference count.
-    const fn new(ref_count: u64) -> Self {
-        Self { ref_count }
-    }
-
     /// Encodes the [`FileInfo`] into a [`PageStorageType`].
     fn encode(&self) -> PageStorageType {
         PageStorageType::new(PageType::File).encode_refcount(self.ref_count)
@@ -580,20 +568,6 @@ impl MemoryRegion {
         self.allocate_pages_info(order, pg)
     }
 
-    /// Allocates a single page.
-    fn allocate_page(&mut self) -> Result<VirtAddr, AllocError> {
-        self.allocate_pages(0)
-    }
-
-    /// Allocates a zeroed page.
-    fn allocate_zeroed_page(&mut self) -> Result<VirtAddr, AllocError> {
-        let vaddr = self.allocate_page()?;
-
-        zero_mem_region(vaddr, vaddr + PAGE_SIZE);
-
-        Ok(vaddr)
-    }
-
     /// Allocates a slab page.
     fn allocate_slab_page(&mut self, item_size: u16) -> Result<VirtAddr, AllocError> {
         self.refill_page_list(0)?;
@@ -604,48 +578,6 @@ impl MemoryRegion {
         });
         self.write_page_info(pfn, pg);
         Ok(self.start_virt + (pfn * PAGE_SIZE))
-    }
-
-    /// Allocates a file page with initial reference count.
-    fn allocate_file_page(&mut self) -> Result<VirtAddr, AllocError> {
-        let pg = PageInfo::File(FileInfo::new(1));
-        self.allocate_pages_info(0, pg)
-    }
-
-    /// Gets a file page and increments its reference count.
-    fn get_file_page(&mut self, vaddr: VirtAddr) -> Result<(), AllocError> {
-        let pfn = self.get_pfn(vaddr)?;
-        let page = self.read_page_info(pfn);
-        let PageInfo::File(mut fi) = page else {
-            return Err(AllocError::InvalidFilePage(vaddr));
-        };
-
-        assert!(fi.ref_count > 0);
-        fi.ref_count += 1;
-        self.write_page_info(pfn, PageInfo::File(fi));
-
-        Ok(())
-    }
-
-    /// Releases a file page and decrements its reference count.
-    fn put_file_page(&mut self, vaddr: VirtAddr) -> Result<(), AllocError> {
-        let pfn = self.get_pfn(vaddr)?;
-        let page = self.read_page_info(pfn);
-        let PageInfo::File(mut fi) = page else {
-            return Err(AllocError::InvalidFilePage(vaddr));
-        };
-
-        fi.ref_count = fi
-            .ref_count
-            .checked_sub(1)
-            .expect("page refcount underflow");
-        if fi.ref_count > 0 {
-            self.write_page_info(pfn, PageInfo::File(fi));
-        } else {
-            self.free_page(vaddr)
-        }
-
-        Ok(())
     }
 
     /// Finds the neighboring page frame number for a compound page.
@@ -901,107 +833,6 @@ impl MemoryRegion {
     }
 }
 
-/// Represents a reference to a memory page, holding both virtual and
-/// physical addresses.
-#[derive(Debug)]
-pub struct PageRef {
-    virt_addr: VirtAddr,
-    phys_addr: PhysAddr,
-}
-
-impl PageRef {
-    /// Allocate a reference-counted file page.
-    pub fn new() -> Result<Self, SvsmError> {
-        let virt_addr = allocate_file_page()?;
-        let phys_addr = virt_to_phys(virt_addr);
-
-        Ok(Self {
-            virt_addr,
-            phys_addr,
-        })
-    }
-
-    /// Returns the virtual address of the memory page.
-    pub fn virt_addr(&self) -> VirtAddr {
-        self.virt_addr
-    }
-
-    /// Returns the physical address of the memory page.
-    pub fn phys_addr(&self) -> PhysAddr {
-        self.phys_addr
-    }
-
-    pub fn try_copy_page(&self) -> Result<Self, SvsmError> {
-        let virt_addr = allocate_file_page()?;
-
-        let src = self.virt_addr.bits();
-        let dst = virt_addr.bits();
-        let size = PAGE_SIZE;
-        unsafe {
-            // SAFETY: `src` and `dst` are both valid.
-            copy_bytes(src, dst, size);
-        }
-
-        Ok(PageRef {
-            virt_addr,
-            phys_addr: virt_to_phys(virt_addr),
-        })
-    }
-
-    pub fn write(&self, offset: usize, buf: &[u8]) {
-        assert!(offset.checked_add(buf.len()).unwrap() <= PAGE_SIZE);
-
-        let src = buf.as_ptr() as usize;
-        let dst = self.virt_addr.bits() + offset;
-        let size = buf.len();
-        unsafe {
-            // SAFETY: `src` and `dst` are both valid.
-            copy_bytes(src, dst, size);
-        }
-    }
-
-    pub fn read(&self, offset: usize, buf: &mut [u8]) {
-        assert!(offset.checked_add(buf.len()).unwrap() <= PAGE_SIZE);
-
-        let src = self.virt_addr.bits() + offset;
-        let dst = buf.as_mut_ptr() as usize;
-        let size = buf.len();
-        unsafe {
-            // SAFETY: `src` and `dst` are both valid.
-            copy_bytes(src, dst, size);
-        }
-    }
-
-    pub fn fill(&self, offset: usize, value: u8) {
-        let dst = self.virt_addr.bits() + offset;
-        let size = PAGE_SIZE.checked_sub(offset).unwrap();
-
-        unsafe {
-            // SAFETY: `dst` is valid.
-            write_bytes(dst, size, value);
-        }
-    }
-}
-
-impl Clone for PageRef {
-    /// Clones the [`PageRef`] instance, obtaining a new reference to the same memory page.
-    fn clone(&self) -> Self {
-        get_file_page(self.virt_addr).expect("Failed to get page reference");
-        PageRef {
-            virt_addr: self.virt_addr,
-            phys_addr: self.phys_addr,
-        }
-    }
-}
-
-impl Drop for PageRef {
-    /// Drops the [`PageRef`] instance, decreasing the reference count for
-    /// the associated memory page.
-    fn drop(&mut self) {
-        put_file_page(self.virt_addr).expect("Failed to drop page reference");
-    }
-}
-
 /// Prints memory information based on the provided [`MemInfo`] structure.
 ///
 /// # Arguments
@@ -1034,16 +865,6 @@ pub fn print_memory_info(info: &MemInfo) {
 /// root memory region.
 static ROOT_MEM: SpinLock<MemoryRegion> = SpinLock::new(MemoryRegion::new());
 
-/// Allocates a single memory page from the root memory region.
-///
-/// # Returns
-///
-/// Result containing the virtual address of the allocated page or an
-/// `SvsmError` if allocation fails.
-pub fn allocate_page() -> Result<VirtAddr, SvsmError> {
-    Ok(ROOT_MEM.lock().allocate_page()?)
-}
-
 /// Allocates multiple memory pages with a specified order from the root
 /// memory region.
 ///
@@ -1057,50 +878,6 @@ pub fn allocate_page() -> Result<VirtAddr, SvsmError> {
 /// `SvsmError` if allocation fails.
 pub fn allocate_pages(order: usize) -> Result<VirtAddr, SvsmError> {
     Ok(ROOT_MEM.lock().allocate_pages(order)?)
-}
-
-/// Allocate a slab page.
-///
-/// # Arguments
-///
-/// `slab` - slab virtual address
-///
-/// # Returns
-///
-/// Result containing the virtual address of the allocated slab page or an
-/// `SvsmError` if allocation fails.
-pub fn allocate_slab_page(item_size: u16) -> Result<VirtAddr, SvsmError> {
-    Ok(ROOT_MEM.lock().allocate_slab_page(item_size)?)
-}
-
-/// Allocate a zeroed page.
-///
-/// # Returns
-///
-/// Result containing the virtual address of the allocated zeroed page or an
-/// `SvsmError` if allocation fails.
-pub fn allocate_zeroed_page() -> Result<VirtAddr, SvsmError> {
-    Ok(ROOT_MEM.lock().allocate_zeroed_page()?)
-}
-
-/// Allocate a file page.
-///
-/// # Returns
-///
-/// Result containing the virtual address of the allocated file page or an
-/// `SvsmError` if allocation fails.
-pub fn allocate_file_page() -> Result<VirtAddr, SvsmError> {
-    let vaddr = ROOT_MEM.lock().allocate_file_page()?;
-    zero_mem_region(vaddr, vaddr + PAGE_SIZE);
-    Ok(vaddr)
-}
-
-fn get_file_page(vaddr: VirtAddr) -> Result<(), SvsmError> {
-    Ok(ROOT_MEM.lock().get_file_page(vaddr)?)
-}
-
-fn put_file_page(vaddr: VirtAddr) -> Result<(), SvsmError> {
-    Ok(ROOT_MEM.lock().put_file_page(vaddr)?)
 }
 
 /// Free the page at the given virtual address.

@@ -5,18 +5,12 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::idt::common::X86ExceptionContext;
-use crate::address::Address;
 use crate::address::VirtAddr;
 use crate::cpu::cpuid::{cpuid_table_raw, CpuidLeaf};
 use crate::cpu::percpu::current_ghcb;
-use crate::cpu::percpu::this_cpu;
 use crate::cpu::X86GeneralRegs;
-use crate::debug::gdbstub::svsm_gdbstub::handle_debug_exception;
 use crate::error::SvsmError;
-use crate::insn_decode::{
-    DecodedInsn, DecodedInsnCtx, Immediate, Instruction, Operand, Register, MAX_INSN_SIZE,
-};
-use crate::mm::GuestPtr;
+use crate::insn_decode::{DecodedInsn, DecodedInsnCtx, Immediate, Instruction, Operand, Register};
 use crate::sev::ghcb::GHCB;
 use core::fmt;
 
@@ -27,8 +21,6 @@ pub const SVM_EXIT_CPUID: usize = 0x72;
 pub const SVM_EXIT_IOIO: usize = 0x7b;
 pub const SVM_EXIT_MSR: usize = 0x7c;
 pub const SVM_EXIT_RDTSCP: usize = 0x87;
-pub const X86_TRAP_DB: usize = 0x01;
-pub const X86_TRAP: usize = SVM_EXIT_EXCP_BASE + X86_TRAP_DB;
 
 const MSR_SVSM_CAA: u64 = 0xc001f000;
 
@@ -122,57 +114,9 @@ pub fn stage2_handle_vc_exception(ctx: &mut X86ExceptionContext) -> Result<(), S
     Ok(())
 }
 
-pub fn handle_vc_exception(ctx: &mut X86ExceptionContext, vector: usize) -> Result<(), SvsmError> {
-    let error_code = ctx.error_code;
-
-    // To handle NAE events, we're supposed to reset the VALID_BITMAP field of
-    // the GHCB. This is currently only relevant for IOIO, RDTSC and RDTSCP
-    // handling. This field is currently reset in the relevant GHCB methods
-    // but it would be better to move the reset out of the different
-    // handlers.
-    let ghcb = current_ghcb();
-
-    let insn_ctx = vc_decode_insn(ctx)?;
-
-    match (error_code, insn_ctx.as_ref().and_then(|d| d.insn())) {
-        // If the gdb stub is enabled then debugging operations such as single stepping
-        // will cause either an exception via DB_VECTOR if the DEBUG_SWAP sev_feature is
-        // clear, or a VC exception with an error code of X86_TRAP if set.
-        (X86_TRAP, _) => {
-            handle_debug_exception(ctx, vector);
-            Ok(())
-        }
-        (SVM_EXIT_CPUID, Some(DecodedInsn::Cpuid)) => handle_cpuid(ctx),
-        (SVM_EXIT_IOIO, Some(_)) => insn_ctx
-            .as_ref()
-            .unwrap()
-            .emulate(ctx)
-            .map_err(SvsmError::from),
-        (SVM_EXIT_MSR, Some(ins)) => handle_msr(ctx, ghcb, ins),
-        (SVM_EXIT_RDTSC, Some(DecodedInsn::Rdtsc)) => ghcb.rdtsc_regs(&mut ctx.regs),
-        (SVM_EXIT_RDTSCP, Some(DecodedInsn::Rdtsc)) => ghcb.rdtscp_regs(&mut ctx.regs),
-        _ => Err(VcError::new(ctx, VcErrorType::Unsupported).into()),
-    }?;
-
-    vc_finish_insn(ctx, &insn_ctx);
-    Ok(())
-}
-
 #[inline]
 const fn get_msr(regs: &X86GeneralRegs) -> u64 {
     ((regs.rdx as u64) << 32) | regs.rax as u64 & u32::MAX as u64
-}
-
-/// Handles a read from the SVSM-specific MSR defined the in SVSM spec.
-fn handle_svsm_caa_rdmsr(ctx: &mut X86ExceptionContext) -> Result<(), SvsmError> {
-    let caa = this_cpu()
-        .guest_vmsa_ref()
-        .caa_phys()
-        .ok_or(SvsmError::MissingCAA)?
-        .bits();
-    ctx.regs.rdx = (caa >> 32) & 0xffffffff;
-    ctx.regs.rax = caa & 0xffffffff;
-    Ok(())
 }
 
 fn handle_msr(
@@ -187,12 +131,7 @@ fn handle_msr(
             }
             ghcb.wrmsr_regs(&ctx.regs)
         }
-        DecodedInsn::Rdmsr => {
-            if get_msr(&ctx.regs) == MSR_SVSM_CAA {
-                return handle_svsm_caa_rdmsr(ctx);
-            }
-            ghcb.rdmsr_regs(&mut ctx.regs)
-        }
+        DecodedInsn::Rdmsr => ghcb.rdmsr_regs(&mut ctx.regs),
         _ => Err(VcError::new(ctx, VcErrorType::DecodeFailed).into()),
     }
 }
@@ -271,15 +210,13 @@ fn vc_decode_insn(ctx: &X86ExceptionContext) -> Result<Option<DecodedInsnCtx>, S
     // TODO: the instruction fetch will likely to be handled differently when
     // #VC exception will be raised from CPL > 0.
 
-    let rip: GuestPtr<[u8; MAX_INSN_SIZE]> = GuestPtr::new(VirtAddr::from(ctx.frame.rip));
-
     // rip and rip+15 addresses should belong to a mapped page.
     // To ensure this, we rely on GuestPtr::read() that uses the exception table
     // to handle faults while fetching.
     // SAFETY: we trust the CPU-provided register state to be valid. Thus, RIP
     // will point to the instruction that caused #VC to be raised, so it can
     // safely be read.
-    let insn_raw = unsafe { rip.read()? };
+    let insn_raw = unsafe { VirtAddr::from(ctx.frame.rip).as_ptr::<[u8; 15]>().read() };
 
     let insn = Instruction::new(insn_raw);
     Ok(Some(insn.decode(ctx)?))
@@ -292,7 +229,7 @@ fn vc_decoding_needed(error_code: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cpu::msr::{rdtsc, rdtscp, read_msr, write_msr, RdtscpOut};
+    use crate::cpu::msr::{rdtsc, rdtscp, read_msr, write_msr};
     use crate::sev::ghcb::GHCB;
     use crate::sev::utils::{get_dr7, raw_vmmcall, set_dr7};
     use core::arch::asm;

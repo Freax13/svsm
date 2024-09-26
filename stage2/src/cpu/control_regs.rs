@@ -4,35 +4,8 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use super::features::cpu_has_pge;
-use crate::address::{Address, PhysAddr};
-use crate::platform::SvsmPlatform;
 use bitflags::bitflags;
 use core::arch::asm;
-
-pub fn cr0_init() {
-    let mut cr0 = read_cr0();
-
-    cr0.insert(CR0Flags::WP); // Enable Write Protection
-    cr0.remove(CR0Flags::NW); // Enable caches ...
-    cr0.remove(CR0Flags::CD); // ... if not already happened
-
-    write_cr0(cr0);
-}
-
-pub fn cr4_init(platform: &dyn SvsmPlatform) {
-    let mut cr4 = read_cr4();
-
-    cr4.insert(CR4Flags::PSE); // Enable Page Size Extensions
-
-    // All processors that are capable of virtualization will support global
-    // page table entries, so there is no reason to support any processor that
-    // does not enumerate PGE capability.
-    assert!(cpu_has_pge(platform), "CPU does not support PGE");
-
-    cr4.insert(CR4Flags::PGE); // Enable Global Pages
-    write_cr4(cr4);
-}
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]
@@ -63,16 +36,6 @@ pub fn read_cr0() -> CR0Flags {
     CR0Flags::from_bits_truncate(cr0)
 }
 
-pub fn write_cr0(cr0: CR0Flags) {
-    let reg = cr0.bits();
-
-    unsafe {
-        asm!("mov %rax, %cr0",
-             in("rax") reg,
-             options(att_syntax));
-    }
-}
-
 pub fn read_cr2() -> usize {
     let ret: usize;
     unsafe {
@@ -81,32 +44,6 @@ pub fn read_cr2() -> usize {
              options(att_syntax));
     }
     ret
-}
-
-pub fn write_cr2(cr2: usize) {
-    unsafe {
-        asm!("mov %rax, %cr2",
-             in("rax") cr2,
-             options(att_syntax));
-    }
-}
-
-pub fn read_cr3() -> PhysAddr {
-    let ret: usize;
-    unsafe {
-        asm!("mov %cr3, %rax",
-             out("rax") ret,
-             options(att_syntax));
-    }
-    PhysAddr::from(ret)
-}
-
-pub fn write_cr3(cr3: PhysAddr) {
-    unsafe {
-        asm!("mov %rax, %cr3",
-             in("rax") cr3.bits(),
-             options(att_syntax));
-    }
 }
 
 bitflags! {
@@ -146,14 +83,4 @@ pub fn read_cr4() -> CR4Flags {
     }
 
     CR4Flags::from_bits_truncate(cr4)
-}
-
-pub fn write_cr4(cr4: CR4Flags) {
-    let reg = cr4.bits();
-
-    unsafe {
-        asm!("mov %rax, %cr4",
-             in("rax") reg,
-             options(att_syntax));
-    }
 }

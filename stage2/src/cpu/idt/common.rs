@@ -4,50 +4,20 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-extern crate alloc;
-
 use crate::address::{Address, VirtAddr};
 use crate::cpu::control_regs::{read_cr0, read_cr4};
 use crate::cpu::efer::read_efer;
 use crate::cpu::gdt::gdt;
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
-use crate::insn_decode::{InsnError, InsnMachineCtx, InsnMachineMem, Register, SegRegister};
+use crate::insn_decode::{InsnMachineCtx, Register, SegRegister};
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
-use crate::mm::GuestPtr;
-use crate::platform::SVSM_PLATFORM;
-use crate::types::{Bytes, SVSM_CS};
-use alloc::boxed::Box;
+use crate::types::SVSM_CS;
 use core::arch::{asm, global_asm};
 use core::mem;
-use core::ptr::addr_of;
 
-pub const DE_VECTOR: usize = 0;
-pub const DB_VECTOR: usize = 1;
-pub const NMI_VECTOR: usize = 2;
-pub const BP_VECTOR: usize = 3;
-pub const OF_VECTOR: usize = 4;
-pub const BR_VECTOR: usize = 5;
-pub const UD_VECTOR: usize = 6;
-pub const NM_VECTOR: usize = 7;
 pub const DF_VECTOR: usize = 8;
-pub const CSO_VECTOR: usize = 9;
-pub const TS_VECTOR: usize = 10;
-pub const NP_VECTOR: usize = 11;
-pub const SS_VECTOR: usize = 12;
-pub const GP_VECTOR: usize = 13;
-pub const PF_VECTOR: usize = 14;
-pub const MF_VECTOR: usize = 16;
-pub const AC_VECTOR: usize = 17;
-pub const MCE_VECTOR: usize = 18;
-pub const XF_VECTOR: usize = 19;
-pub const CP_VECTOR: usize = 21;
 pub const HV_VECTOR: usize = 28;
 pub const VC_VECTOR: usize = 29;
-pub const SX_VECTOR: usize = 30;
-
-pub const PF_ERROR_WRITE: usize = 2;
-
-pub const INT_INJ_VECTOR: usize = 0x50;
 
 bitflags::bitflags! {
     /// Page fault error code flags.
@@ -110,80 +80,6 @@ impl InsnMachineCtx for X86ExceptionContext {
             Register::Rip => self.frame.rip,
         }
     }
-
-    fn read_flags(&self) -> usize {
-        self.frame.flags
-    }
-
-    fn write_reg(&mut self, reg: Register, val: usize) {
-        match reg {
-            Register::Rax => self.regs.rax = val,
-            Register::Rdx => self.regs.rdx = val,
-            Register::Rcx => self.regs.rcx = val,
-            Register::Rbx => self.regs.rdx = val,
-            Register::Rsp => self.frame.rsp = val,
-            Register::Rbp => self.regs.rbp = val,
-            Register::Rdi => self.regs.rdi = val,
-            Register::Rsi => self.regs.rsi = val,
-            Register::R8 => self.regs.r8 = val,
-            Register::R9 => self.regs.r9 = val,
-            Register::R10 => self.regs.r10 = val,
-            Register::R11 => self.regs.r11 = val,
-            Register::R12 => self.regs.r12 = val,
-            Register::R13 => self.regs.r13 = val,
-            Register::R14 => self.regs.r14 = val,
-            Register::R15 => self.regs.r15 = val,
-            Register::Rip => self.frame.rip = val,
-        }
-    }
-
-    fn read_cpl(&self) -> usize {
-        self.frame.cs & 3
-    }
-
-    fn map_linear_addr<T: Copy + 'static>(
-        &self,
-        la: usize,
-        _write: bool,
-        _fetch: bool,
-    ) -> Result<Box<dyn InsnMachineMem<Item = T>>, InsnError> {
-        if user_mode(self) {
-            todo!();
-        } else {
-            Ok(Box::new(GuestPtr::<T>::new(VirtAddr::from(la))))
-        }
-    }
-
-    fn ioio_perm(&self, _port: u16, _size: Bytes, _io_read: bool) -> bool {
-        // Check if the IO port can be supported by user mode
-        todo!();
-    }
-
-    fn ioio_in(&self, port: u16, size: Bytes) -> Result<u64, InsnError> {
-        let io_port = SVSM_PLATFORM.as_dyn_ref().get_io_port();
-        let data = match size {
-            Bytes::One => io_port.inb(port) as u64,
-            Bytes::Two => io_port.inw(port) as u64,
-            Bytes::Four => io_port.inl(port) as u64,
-            _ => return Err(InsnError::IoIoIn),
-        };
-        Ok(data)
-    }
-
-    fn ioio_out(&mut self, port: u16, size: Bytes, data: u64) -> Result<(), InsnError> {
-        let io_port = SVSM_PLATFORM.as_dyn_ref().get_io_port();
-        match size {
-            Bytes::One => io_port.outb(port, data as u8),
-            Bytes::Two => io_port.outw(port, data as u16),
-            Bytes::Four => io_port.outl(port, data as u32),
-            _ => return Err(InsnError::IoIoOut),
-        }
-        Ok(())
-    }
-}
-
-pub fn user_mode(ctxt: &X86ExceptionContext) -> bool {
-    (ctxt.frame.cs & 3) == 3
 }
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -345,35 +241,8 @@ impl ReadLockGuard<'static, IDT> {
 
 static IDT: RWLock<IDT> = RWLock::new(IDT::new());
 
-pub fn idt() -> ReadLockGuard<'static, IDT> {
-    IDT.lock_read()
-}
-
 pub fn idt_mut() -> WriteLockGuard<'static, IDT> {
     IDT.lock_write()
-}
-
-pub fn triple_fault() {
-    let desc: IdtDesc = IdtDesc {
-        size: 0,
-        address: VirtAddr::from(0u64),
-    };
-
-    unsafe {
-        asm!("lidt (%rax)
-              int3", in("rax") &desc, options(att_syntax));
-    }
-}
-
-extern "C" {
-    static entry_code_start: u8;
-    static entry_code_end: u8;
-}
-
-pub fn is_exception_handler_return_site(rip: VirtAddr) -> bool {
-    let start = VirtAddr::from(unsafe { addr_of!(entry_code_start) });
-    let end = VirtAddr::from(unsafe { addr_of!(entry_code_end) });
-    (start..end).contains(&rip)
 }
 
 global_asm!(

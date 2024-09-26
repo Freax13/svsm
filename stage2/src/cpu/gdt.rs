@@ -6,7 +6,7 @@
 
 use super::tss::X86Tss;
 use crate::address::VirtAddr;
-use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
+use crate::locking::{RWLock, ReadLockGuard};
 use crate::types::{SVSM_CS, SVSM_DS, SVSM_TSS};
 use core::arch::asm;
 use core::mem;
@@ -155,8 +155,4 @@ static GDT: RWLock<GDT> = RWLock::new(GDT::new());
 
 pub fn gdt() -> ReadLockGuard<'static, GDT> {
     GDT.lock_read()
-}
-
-pub fn gdt_mut() -> WriteLockGuard<'static, GDT> {
-    GDT.lock_write()
 }

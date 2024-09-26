@@ -110,7 +110,6 @@ pub const SIZE_1G: usize = SIZE_1M * 1024;
 
 /// Pagesize definitions
 pub const PAGE_SIZE: usize = SIZE_1K * 4;
-pub const PAGE_SIZE_2M: usize = SIZE_1M * 2;
 
 /// More size helpers
 pub const SIZE_LEVEL3: usize = 1usize << ((9 * 3) + 12);

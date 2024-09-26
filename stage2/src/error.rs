@@ -18,30 +18,13 @@
 //! a way to convert a leaf error into a SvsmError via the [`From`] trait.
 
 use crate::cpu::vc::VcError;
-use crate::fs::FsError;
 use crate::fw_cfg::FwCfgError;
 use crate::insn_decode::InsnError;
 use crate::mm::alloc::AllocError;
 use crate::sev::ghcb::GhcbError;
 use crate::sev::msr_protocol::GhcbMsrError;
 use crate::sev::SevSnpError;
-use crate::syscall::ObjError;
-use crate::task::TaskError;
 use elf::ElfError;
-
-/// Errors related to APIC handling.  These may originate from multiple
-/// layers in the system.
-#[derive(Clone, Copy, Debug)]
-pub enum ApicError {
-    /// An error arising because APIC emulation is disabled.
-    Disabled,
-
-    /// An error related to APIC emulation.
-    Emulation,
-
-    /// An error related to APIC registration.
-    Registration,
-}
 
 /// A generic error during SVSM operation.
 #[derive(Clone, Copy, Debug)]
@@ -62,16 +45,8 @@ pub enum SvsmError {
     Mem,
     /// Errors related to the memory allocator
     Alloc(AllocError),
-    /// Error reported when there is no VMSA set up.
-    MissingVMSA,
-    /// Error reported when there is no CAA (Calling Area Address) set up.
-    MissingCAA,
-    /// Error reported when there is no secrets page set up.
-    MissingSecrets,
     /// Instruction decode related errors
     Insn(InsnError),
-    /// Invalid address, usually provided by the guest
-    InvalidAddress,
     /// Error reported when convert a usize to Bytes
     InvalidBytes,
     /// Errors related to firmware parsing
@@ -82,34 +57,12 @@ pub enum SvsmError {
     FwCfg(FwCfgError),
     /// Errors related to ACPI parsing.
     Acpi,
-    /// Errors from the filesystem.
-    FileSystem(FsError),
-    /// Obj related error
-    Obj(ObjError),
-    /// Task management errors,
-    Task(TaskError),
     /// Errors from #VC handler
     Vc(VcError),
-    /// The operation is not supported.
-    NotSupported,
-    /// Generic errors related to APIC emulation.
-    Apic(ApicError),
 }
 
 impl From<ElfError> for SvsmError {
     fn from(err: ElfError) -> Self {
         Self::Elf(err)
-    }
-}
-
-impl From<ApicError> for SvsmError {
-    fn from(err: ApicError) -> Self {
-        Self::Apic(err)
-    }
-}
-
-impl From<ObjError> for SvsmError {
-    fn from(err: ObjError) -> Self {
-        Self::Obj(err)
     }
 }

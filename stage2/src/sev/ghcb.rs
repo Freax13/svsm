@@ -14,17 +14,14 @@ use crate::mm::validate::{
 };
 use crate::mm::virt_to_phys;
 use crate::platform::PageStateChangeOp;
-use crate::sev::hv_doorbell::HVDoorbell;
 use crate::sev::sev_snp_enabled;
 use crate::sev::utils::raw_vmgexit;
 use crate::types::{Bytes, PageSize, GUEST_VMPL, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 
 use crate::mm::PageBox;
-use core::arch::global_asm;
 use core::mem::{self, offset_of};
 use core::ops::Deref;
-use core::ptr;
 use core::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering};
 
 use super::msr_protocol::{invalidate_page_msr, register_ghcb_gpa_msr, validate_page_msr};
@@ -673,83 +670,6 @@ impl GHCB {
         }
     }
 }
-
-extern "C" {
-    pub fn switch_to_vmpl_unsafe(hv_doorbell: *const HVDoorbell, vmpl: u32) -> bool;
-}
-
-pub fn switch_to_vmpl(vmpl: u32) {
-    // The switch to a lower VMPL must be done with an assembly sequence in
-    // order to ensure that any #HV that occurs during the sequence will
-    // correctly block the VMPL switch so that events can be processed.
-    let hv_doorbell = this_cpu().hv_doorbell();
-    let ptr = match hv_doorbell {
-        Some(doorbell) => ptr::from_ref(doorbell),
-        None => ptr::null(),
-    };
-    unsafe {
-        if !switch_to_vmpl_unsafe(ptr, vmpl) {
-            panic!("Failed to switch to VMPL {}", vmpl);
-        }
-    }
-}
-
-global_asm!(
-    r#"
-        .globl switch_to_vmpl_unsafe
-    switch_to_vmpl_unsafe:
-
-        /* Upon entry,
-         * rdi = pointer to the HV doorbell page
-         * esi = target VMPL
-         */
-        /* Check if NoFurtherSignal is set (bit 15 of the first word of the
-         * #HV doorbell page).  If so, abort the transition. */
-        test %rdi, %rdi
-        jz switch_vmpl_proceed
-        testw $0x8000, (%rdi)
-
-        /* From this point until the vmgexit, if a #HV arrives, the #HV handler
-         * must prevent the VMPL transition. */
-        .globl switch_vmpl_window_start
-    switch_vmpl_window_start:
-        jnz switch_vmpl_cancel
-
-    switch_vmpl_proceed:
-        /* Use the MSR-based VMPL switch request to avoid any need to use the
-         * GHCB page.  Run VMPL request is 0x16 and response is 0x17. */
-        movl $0x16, %eax
-        movl %esi, %edx
-        movl $0xC0010130, %ecx
-        wrmsr
-        rep; vmmcall
-
-        .globl switch_vmpl_window_end
-    switch_vmpl_window_end:
-        /* Verify that the request was honored.  ECX still contains the MSR
-         * number. */
-        rdmsr
-        andl $0xFFF, %eax
-        cmpl $0x17, %eax
-        jz switch_vmpl_cancel
-        xorl %eax, %eax
-        ret
-
-        /* An aborted VMPL switch is treated as a successful switch. */
-        .globl switch_vmpl_cancel
-    switch_vmpl_cancel:
-        /* Process any pending events if NoFurtherSignal has been set. */
-        test %rdi, %rdi
-        jz no_pending_events
-        testw $0x8000, (%rdi)
-        jz no_pending_events
-        call process_hv_events
-    no_pending_events:
-        movl $1, %eax
-        ret
-        "#,
-    options(att_syntax)
-);
 
 #[cfg(test)]
 mod tests {

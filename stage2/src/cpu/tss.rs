@@ -8,9 +8,6 @@ use super::gdt::GDTEntry;
 use crate::address::VirtAddr;
 use core::num::NonZeroU8;
 
-// IST offsets
-pub const IST_DF: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(1) };
-
 #[derive(Debug, Default, Clone, Copy)]
 #[repr(C, packed(4))]
 pub struct X86Tss {

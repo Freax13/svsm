@@ -46,8 +46,6 @@ pub const GUEST_VMPL: usize = 2;
 #[allow(clippy::assertions_on_constants)]
 const _: () = assert!(GUEST_VMPL > 0 && GUEST_VMPL < VMPL_MAX);
 
-pub const MAX_CPUS: usize = 512;
-
 /// Length in byte which represents maximum 8 bytes(u64)
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Bytes {

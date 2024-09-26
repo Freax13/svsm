@@ -52,18 +52,6 @@ impl SvsmPlatform for TdpPlatform {
         init_console(&*CONSOLE_SERIAL).map_err(|_| SvsmError::Console)
     }
 
-    fn env_setup_svsm(&self) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn setup_percpu(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
-    fn setup_percpu_current(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks {
         // Find physical address size.
         let res = CpuidResult::get(0x80000008, 0);
@@ -74,10 +62,6 @@ impl SvsmPlatform for TdpPlatform {
             addr_mask_width: vtom.trailing_zeros(),
             phys_addr_sizes: res.eax & 0xff,
         }
-    }
-
-    fn cpuid(&self, eax: u32) -> Option<CpuidResult> {
-        Some(CpuidResult::get(eax, 0))
     }
 
     fn setup_guest_host_comm(&mut self, _cpu: &PerCpu, _is_bsp: bool) {}
@@ -95,41 +79,11 @@ impl SvsmPlatform for TdpPlatform {
         Err(SvsmError::Tdx)
     }
 
-    fn validate_physical_page_range(
-        &self,
-        _region: MemoryRegion<PhysAddr>,
-        _op: PageValidateOp,
-    ) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
     fn validate_virtual_page_range(
         &self,
         _region: MemoryRegion<VirtAddr>,
         _op: PageValidateOp,
     ) -> Result<(), SvsmError> {
         Err(SvsmError::Tdx)
-    }
-
-    fn configure_alternate_injection(&mut self, _alt_inj_requested: bool) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
-    fn change_apic_registration_state(&self, _incr: bool) -> Result<bool, SvsmError> {
-        Err(SvsmError::NotSupported)
-    }
-
-    fn query_apic_registration_state(&self) -> bool {
-        false
-    }
-
-    fn post_irq(&self, _icr: u64) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
-    fn eoi(&self) {}
-
-    fn start_cpu(&self, _cpu: &PerCpu, _start_rip: u64) -> Result<(), SvsmError> {
-        todo!();
     }
 }
