@@ -806,6 +806,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "stage2"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "bitfield-struct",
+ "bitflags 2.5.0",
+ "bootlib",
+ "cpuarch",
+ "elf",
+ "gdbstub",
+ "gdbstub_arch",
+ "igvm_defs",
+ "intrusive-collections",
+ "libmstpm",
+ "log",
+ "packit",
+ "syscall",
+ "test",
+ "zerocopy",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

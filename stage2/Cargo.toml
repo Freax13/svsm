@@ -1,5 +1,5 @@
 [package]
-name = "svsm"
+name = "stage2"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80.0"
@@ -7,11 +7,6 @@ rust-version = "1.80.0"
 [[bin]]
 name = "stage2"
 path = "src/stage2.rs"
-test = false
-
-[[bin]]
-name = "svsm"
-path = "src/svsm.rs"
 test = false
 
 [lib]
