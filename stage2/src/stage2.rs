@@ -16,7 +16,6 @@ mod debug;
 mod error;
 mod fw_cfg;
 mod igvm_params;
-mod insn_decode;
 mod io;
 mod locking;
 mod mm;

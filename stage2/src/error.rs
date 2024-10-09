@@ -18,7 +18,6 @@
 //! a way to convert a leaf error into a SvsmError via the [`From`] trait.
 
 use crate::fw_cfg::FwCfgError;
-use crate::insn_decode::InsnError;
 use crate::mm::alloc::AllocError;
 use crate::sev::ghcb::GhcbError;
 use crate::sev::msr_protocol::GhcbMsrError;
@@ -64,8 +63,6 @@ pub enum SvsmError {
     MissingCAA,
     /// Error reported when there is no secrets page set up.
     MissingSecrets,
-    /// Instruction decode related errors
-    Insn(InsnError),
     /// Invalid address, usually provided by the guest
     InvalidAddress,
     /// Error reported when convert a usize to Bytes
