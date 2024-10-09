@@ -16,7 +16,6 @@ pub mod percpu;
 pub mod registers;
 pub mod tlb;
 
-pub use gdt::{gdt, gdt_mut};
 pub use idt::common::X86ExceptionContext;
 pub use irq_state::{irqs_disabled, irqs_enabled, IrqGuard, IrqState};
 pub use percpu::{irqs_disable, irqs_enable};
