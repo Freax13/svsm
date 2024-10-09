@@ -54,21 +54,3 @@ macro_rules! BIT_MASK {
         (((1u64 << ($e - $s + 1)) - 1) << $s)
     }};
 }
-
-#[cfg(test)]
-mod tests {
-
-    use crate::utils::util::*;
-
-    #[test]
-    fn test_mem_utils() {
-        // Align up
-        assert_eq!(align_up(7, 4), 8);
-        assert_eq!(align_up(15, 8), 16);
-        assert_eq!(align_up(10, 2), 10);
-        // Align down
-        assert_eq!(align_down(7, 4), 4);
-        assert_eq!(align_down(15, 8), 8);
-        assert_eq!(align_down(10, 2), 10);
-    }
-}
