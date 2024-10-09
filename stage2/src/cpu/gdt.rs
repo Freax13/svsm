@@ -23,10 +23,6 @@ impl GDTEntry {
         Self(entry)
     }
 
-    pub fn to_raw(&self) -> u64 {
-        self.0
-    }
-
     pub const fn null() -> Self {
         Self(0u64)
     }
@@ -69,14 +65,6 @@ impl GDT {
                 GDTEntry::null(),
             ],
         }
-    }
-
-    pub fn kernel_cs(&self) -> GDTEntry {
-        self.entries[(SVSM_CS / 8) as usize]
-    }
-
-    pub fn kernel_ds(&self) -> GDTEntry {
-        self.entries[(SVSM_DS / 8) as usize]
     }
 
     /// Load a GDT. Its lifetime must be static so that its entries are
