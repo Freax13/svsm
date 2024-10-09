@@ -4,9 +4,8 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use super::common::{idt_mut, DF_VECTOR, HV_VECTOR, VC_VECTOR};
+use super::common::{idt_mut, DF_VECTOR, HV_VECTOR};
 use crate::cpu::control_regs::read_cr2;
-use crate::cpu::vc::{stage2_handle_vc_exception, stage2_handle_vc_exception_no_ghcb};
 use crate::cpu::X86ExceptionContext;
 use core::arch::global_asm;
 use core::ptr::addr_of;
@@ -39,7 +38,6 @@ pub extern "C" fn stage2_generic_idt_handler(ctx: &mut X86ExceptionContext, vect
                 rip, rsp, cr2
             );
         }
-        VC_VECTOR => stage2_handle_vc_exception(ctx).expect("Failed to handle #VC"),
         HV_VECTOR =>
             // #HV does not require processing during stage 2 and can be
         // completely ignored.
@@ -68,7 +66,6 @@ pub extern "C" fn stage2_generic_idt_handler_no_ghcb(ctx: &mut X86ExceptionConte
                 rip, rsp, cr2
             );
         }
-        VC_VECTOR => stage2_handle_vc_exception_no_ghcb(ctx).expect("Failed to handle #VC"),
         _ => {
             let err = ctx.error_code;
             let rip = ctx.frame.rip;

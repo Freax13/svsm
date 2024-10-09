@@ -17,7 +17,6 @@
 //! usually the one corresponding to that module. Each module should provide
 //! a way to convert a leaf error into a SvsmError via the [`From`] trait.
 
-use crate::cpu::vc::VcError;
 use crate::fw_cfg::FwCfgError;
 use crate::insn_decode::InsnError;
 use crate::mm::alloc::AllocError;
@@ -57,8 +56,6 @@ pub enum SvsmError {
     FwCfg(FwCfgError),
     /// Errors related to ACPI parsing.
     Acpi,
-    /// Errors from #VC handler
-    Vc(VcError),
 }
 
 impl From<ElfError> for SvsmError {
