@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use super::msr::{read_msr, write_msr, EFER};
 use bitflags::bitflags;
 
 bitflags! {
@@ -22,13 +21,4 @@ bitflags! {
         const INTWB = 1 << 18; // Interruptible WBINVD/WBNOINVD enable
         const UAIE  = 1 << 20; // Upper Address Ignore Enable
     }
-}
-
-pub fn read_efer() -> EFERFlags {
-    EFERFlags::from_bits_truncate(read_msr(EFER))
-}
-
-pub fn write_efer(efer: EFERFlags) {
-    let val = efer.bits();
-    write_msr(EFER, val);
 }
