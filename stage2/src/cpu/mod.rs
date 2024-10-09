@@ -6,7 +6,6 @@
 
 pub mod control_regs;
 pub mod cpuid;
-pub mod efer;
 pub mod gdt;
 pub mod idt;
 pub mod irq_state;

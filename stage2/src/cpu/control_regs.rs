@@ -4,37 +4,7 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use bitflags::bitflags;
 use core::arch::asm;
-
-bitflags! {
-    #[derive(Debug, Clone, Copy)]
-    pub struct CR0Flags: u64 {
-        const PE = 1 << 0;  // Protection Enabled
-        const MP = 1 << 1;  // Monitor Coprocessor
-        const EM = 1 << 2;  // Emulation
-        const TS = 1 << 3;  // Task Switched
-        const ET = 1 << 4;  // Extension Type
-        const NE = 1 << 5;  // Numeric Error
-        const WP = 1 << 16; // Write Protect
-        const AM = 1 << 18; // Alignment Mask
-        const NW = 1 << 29; // Not Writethrough
-        const CD = 1 << 30; // Cache Disable
-        const PG = 1 << 31; // Paging
-    }
-}
-
-pub fn read_cr0() -> CR0Flags {
-    let cr0: u64;
-
-    unsafe {
-        asm!("mov %cr0, %rax",
-             out("rax") cr0,
-             options(att_syntax));
-    }
-
-    CR0Flags::from_bits_truncate(cr0)
-}
 
 pub fn read_cr2() -> usize {
     let ret: usize;
@@ -44,43 +14,4 @@ pub fn read_cr2() -> usize {
              options(att_syntax));
     }
     ret
-}
-
-bitflags! {
-    #[derive(Debug, Clone, Copy)]
-    pub struct CR4Flags: u64 {
-        const VME       = 1 << 0;  // Virtual-8086 Mode Extensions
-        const PVI       = 1 << 1;  // Protected-Mode Virtual Interrupts
-        const TSD       = 1 << 2;  // Time Stamp Disable
-        const DE        = 1 << 3;  // Debugging Extensions
-        const PSE       = 1 << 4;  // Page Size Extensions
-        const PAE       = 1 << 5;  // Physical-Address Extension
-        const MCE       = 1 << 6;  // Machine Check Enable
-        const PGE       = 1 << 7;  // Page-Global Enable
-        const PCE       = 1 << 8;  // Performance-Monitoring Counter Enable
-        const OSFXSR        = 1 << 9;  // Operating System FXSAVE/FXRSTOR Support
-        const OSXMMEXCPT    = 1 << 10; // Operating System Unmasked Exception Support
-        const UMIP      = 1 << 11; // User Mode Instruction Prevention
-        const LA57      = 1 << 12; // 57-bit linear address
-        const FSGSBASE      = 1 << 16; // Enable RDFSBASE, RDGSBASE, WRFSBASE, and
-                           // WRGSBASE instructions
-        const PCIDE     = 1 << 17; // Process Context Identifier Enable
-        const OSXSAVE       = 1 << 18; // XSAVE and Processor Extended States Enable Bit
-        const SMEP      = 1 << 20; // Supervisor Mode Execution Prevention
-        const SMAP      = 1 << 21; // Supervisor Mode Access Protection
-        const PKE       = 1 << 22; // Protection Key Enable
-        const CET       = 1 << 23; // Control-flow Enforcement Technology
-    }
-}
-
-pub fn read_cr4() -> CR4Flags {
-    let cr4: u64;
-
-    unsafe {
-        asm!("mov %cr4, %rax",
-             out("rax") cr4,
-             options(att_syntax));
-    }
-
-    CR4Flags::from_bits_truncate(cr4)
 }
