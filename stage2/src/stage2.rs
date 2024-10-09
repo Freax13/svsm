@@ -31,7 +31,7 @@ use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::config::SvsmConfig;
 use crate::console::install_console_logger;
 use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
-use crate::cpu::gdt;
+use crate::cpu::gdt::GDT;
 use crate::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
 use crate::cpu::percpu::{this_cpu, PerCpu};
 use crate::error::SvsmError;
@@ -97,7 +97,7 @@ fn setup_env(
     platform: &mut dyn SvsmPlatform,
     launch_info: &Stage2LaunchInfo,
 ) {
-    gdt().load();
+    GDT.load();
     early_idt_init_no_ghcb();
 
     let debug_serial_port = config.debug_serial_port();

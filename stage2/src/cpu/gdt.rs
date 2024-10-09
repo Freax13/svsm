@@ -5,10 +5,8 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::address::VirtAddr;
-use crate::locking::{RWLock, ReadLockGuard};
 use crate::types::{SVSM_CS, SVSM_DS};
 use core::arch::asm;
-use core::mem;
 
 #[repr(C, packed(2))]
 #[derive(Clone, Copy, Debug, Default)]
@@ -80,12 +78,10 @@ impl GDT {
     pub fn kernel_ds(&self) -> GDTEntry {
         self.entries[(SVSM_DS / 8) as usize]
     }
-}
 
-impl ReadLockGuard<'static, GDT> {
     /// Load a GDT. Its lifetime must be static so that its entries are
     /// always available to the CPU.
-    pub fn load(&self) {
+    pub fn load(&'static self) {
         let gdt_desc = self.descriptor();
         unsafe {
             asm!(r#" /* Load GDT */
@@ -118,17 +114,6 @@ impl ReadLockGuard<'static, GDT> {
             addr: VirtAddr::from(self.entries.as_ptr()),
         }
     }
-
-    pub fn base_limit(&self) -> (u64, u32) {
-        let gdt_entries = GDT_SIZE as usize;
-        let base: *const GDT = core::ptr::from_ref(self);
-        let limit = ((mem::size_of::<u64>() * gdt_entries) - 1) as u32;
-        (base as u64, limit)
-    }
 }
 
-static GDT: RWLock<GDT> = RWLock::new(GDT::new());
-
-pub fn gdt() -> ReadLockGuard<'static, GDT> {
-    GDT.lock_read()
-}
+pub static GDT: GDT = GDT::new();
