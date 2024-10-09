@@ -5,11 +5,7 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::address::{Address, VirtAddr};
-use crate::cpu::control_regs::{read_cr0, read_cr4};
-use crate::cpu::efer::read_efer;
-use crate::cpu::gdt::gdt;
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
-use crate::insn_decode::{InsnMachineCtx, Register, SegRegister};
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
 use crate::types::SVSM_CS;
 use core::arch::{asm, global_asm};
@@ -37,49 +33,6 @@ pub struct X86ExceptionContext {
     pub regs: X86GeneralRegs,
     pub error_code: usize,
     pub frame: X86InterruptFrame,
-}
-
-impl InsnMachineCtx for X86ExceptionContext {
-    fn read_efer(&self) -> u64 {
-        read_efer().bits()
-    }
-
-    fn read_seg(&self, seg: SegRegister) -> u64 {
-        match seg {
-            SegRegister::CS => gdt().kernel_cs().to_raw(),
-            _ => gdt().kernel_ds().to_raw(),
-        }
-    }
-
-    fn read_cr0(&self) -> u64 {
-        read_cr0().bits()
-    }
-
-    fn read_cr4(&self) -> u64 {
-        read_cr4().bits()
-    }
-
-    fn read_reg(&self, reg: Register) -> usize {
-        match reg {
-            Register::Rax => self.regs.rax,
-            Register::Rdx => self.regs.rdx,
-            Register::Rcx => self.regs.rcx,
-            Register::Rbx => self.regs.rdx,
-            Register::Rsp => self.frame.rsp,
-            Register::Rbp => self.regs.rbp,
-            Register::Rdi => self.regs.rdi,
-            Register::Rsi => self.regs.rsi,
-            Register::R8 => self.regs.r8,
-            Register::R9 => self.regs.r9,
-            Register::R10 => self.regs.r10,
-            Register::R11 => self.regs.r11,
-            Register::R12 => self.regs.r12,
-            Register::R13 => self.regs.r13,
-            Register::R14 => self.regs.r14,
-            Register::R15 => self.regs.r15,
-            Register::Rip => self.frame.rip,
-        }
-    }
 }
 
 #[derive(Copy, Clone, Default, Debug)]

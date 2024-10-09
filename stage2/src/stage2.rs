@@ -16,7 +16,6 @@ mod error;
 mod fw_cfg;
 mod fw_meta;
 mod igvm_params;
-mod insn_decode;
 mod io;
 mod locking;
 mod mm;
