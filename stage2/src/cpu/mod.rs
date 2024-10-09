@@ -15,7 +15,6 @@ pub mod msr;
 pub mod percpu;
 pub mod registers;
 pub mod tlb;
-pub mod tss;
 
 pub use gdt::{gdt, gdt_mut};
 pub use idt::common::X86ExceptionContext;
