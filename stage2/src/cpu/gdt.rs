@@ -4,10 +4,9 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use super::tss::X86Tss;
 use crate::address::VirtAddr;
 use crate::locking::{RWLock, ReadLockGuard};
-use crate::types::{SVSM_CS, SVSM_DS, SVSM_TSS};
+use crate::types::{SVSM_CS, SVSM_DS};
 use core::arch::asm;
 use core::mem;
 
@@ -71,29 +70,6 @@ impl GDT {
                 GDTEntry::null(),
                 GDTEntry::null(),
             ],
-        }
-    }
-
-    unsafe fn set_tss_entry(&mut self, desc0: GDTEntry, desc1: GDTEntry) {
-        let idx = (SVSM_TSS / 8) as usize;
-
-        let tss_entries = &self.entries[idx..idx + 1].as_mut_ptr();
-
-        tss_entries.add(0).write_volatile(desc0);
-        tss_entries.add(1).write_volatile(desc1);
-    }
-
-    unsafe fn clear_tss_entry(&mut self) {
-        self.set_tss_entry(GDTEntry::null(), GDTEntry::null());
-    }
-
-    pub fn load_tss(&mut self, tss: &X86Tss) {
-        let (desc0, desc1) = tss.to_gdt_entry();
-
-        unsafe {
-            self.set_tss_entry(desc0, desc1);
-            asm!("ltr %ax", in("ax") SVSM_TSS, options(att_syntax));
-            self.clear_tss_entry()
         }
     }
 
