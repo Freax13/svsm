@@ -7,7 +7,6 @@
 pub mod ghcb;
 pub mod msr_protocol;
 pub mod status;
-pub mod vmsa;
 
 pub mod utils;
 
