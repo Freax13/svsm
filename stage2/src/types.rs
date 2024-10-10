@@ -5,7 +5,6 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::error::SvsmError;
-use crate::sev::vmsa::VMPL_MAX;
 
 pub const PAGE_SHIFT: usize = 12;
 pub const PAGE_SHIFT_2M: usize = 21;
@@ -42,6 +41,7 @@ pub const SVSM_TR_FLAGS: u16 = 0x89;
 /// Keep VMPL 1 for the SVSM and execute the OS at VMPL-2. This leaves VMPL-3
 /// free for the OS to use in the future.
 pub const GUEST_VMPL: usize = 2;
+pub const VMPL_MAX: usize = 4;
 
 #[allow(clippy::assertions_on_constants)]
 const _: () = assert!(GUEST_VMPL > 0 && GUEST_VMPL < VMPL_MAX);
