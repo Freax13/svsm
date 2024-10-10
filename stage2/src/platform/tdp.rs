@@ -13,7 +13,7 @@ use crate::mm::virt_to_frame;
 use crate::platform::{PageEncryptionMasks, PageStateChangeOp, PageValidateOp, SvsmPlatform};
 use crate::types::PageSize;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
-use crate::utils::{zero_mem_region, MemoryRegion};
+use crate::utils::MemoryRegion;
 use tdx_tdcall::tdx::{
     td_accept_memory, tdvmcall_halt, tdvmcall_io_read_16, tdvmcall_io_read_32, tdvmcall_io_read_8,
     tdvmcall_io_write_16, tdvmcall_io_write_32, tdvmcall_io_write_8,
@@ -94,9 +94,6 @@ impl SvsmPlatform for TdpPlatform {
                     td_accept_memory(pa.address().into(), sz.try_into().unwrap());
                     va = va + sz;
                 }
-            }
-            PageValidateOp::Invalidate => {
-                zero_mem_region(region.start(), region.end());
             }
         }
         Ok(())
