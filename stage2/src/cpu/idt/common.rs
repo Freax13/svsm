@@ -6,7 +6,8 @@
 
 use crate::address::{Address, VirtAddr};
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
-use crate::locking::{RWLock, WriteLockGuard};
+use crate::locking::spinlock::LockGuard;
+use crate::locking::SpinLock;
 use crate::types::SVSM_CS;
 use core::arch::{asm, global_asm};
 
@@ -167,7 +168,7 @@ impl Default for IDT {
     }
 }
 
-impl WriteLockGuard<'static, IDT> {
+impl LockGuard<'static, IDT> {
     /// Load an IDT. Its lifetime must be static so that its entries are
     /// always available to the CPU.
     pub fn load(&self) {
@@ -182,10 +183,10 @@ impl WriteLockGuard<'static, IDT> {
     }
 }
 
-static IDT: RWLock<IDT> = RWLock::new(IDT::new());
+static IDT: SpinLock<IDT> = SpinLock::new(IDT::new());
 
-pub fn idt_mut() -> WriteLockGuard<'static, IDT> {
-    IDT.lock_write()
+pub fn idt_mut() -> LockGuard<'static, IDT> {
+    IDT.lock()
 }
 
 global_asm!(
