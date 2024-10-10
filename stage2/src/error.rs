@@ -18,7 +18,6 @@
 //! a way to convert a leaf error into a SvsmError via the [`From`] trait.
 
 use crate::fw_cfg::FwCfgError;
-use crate::mm::alloc::AllocError;
 use crate::sev::ghcb::GhcbError;
 use crate::sev::msr_protocol::GhcbMsrError;
 use crate::sev::SevSnpError;
@@ -41,8 +40,6 @@ pub enum SvsmError {
     Tdx,
     /// Generic errors related to memory management
     Mem,
-    /// Errors related to the memory allocator
-    Alloc(AllocError),
     /// Error reported when convert a usize to Bytes
     InvalidBytes,
     /// Errors related to firmware parsing

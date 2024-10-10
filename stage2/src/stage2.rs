@@ -36,14 +36,14 @@ use crate::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
 use crate::error::SvsmError;
 use crate::fw_cfg::FwCfg;
 use crate::igvm_params::IgvmParams;
-use crate::mm::alloc::{memory_info, print_memory_info, root_mem_init};
+use crate::mm::alloc::{print_memory_info, root_mem_init};
 use crate::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
 use crate::mm::validate::{
     init_valid_bitmap_alloc, valid_bitmap_addr, valid_bitmap_set_valid_range,
 };
 use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange};
 use crate::platform::{PageStateChangeOp, SvsmPlatform, SvsmPlatformCell};
-use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
+use crate::types::{PageSize, PAGE_SIZE_2M};
 use crate::utils::{halt, is_aligned, MemoryRegion};
 use bootlib::kernel_launch::{KernelLaunchInfo, Stage2LaunchInfo};
 use bootlib::platform::SvsmPlatformType;
@@ -62,10 +62,7 @@ use platform::PageValidateOp;
 fn setup_stage2_allocator(heap_start: u64, heap_end: u64) {
     let vstart = VirtAddr::from(heap_start);
     let vend = VirtAddr::from(heap_end);
-    let pstart = PhysAddr::from(vstart.bits()); // Identity mapping
-    let nr_pages = (vend - vstart) / PAGE_SIZE;
-
-    root_mem_init(pstart, vstart, nr_pages);
+    root_mem_init(vstart, vend);
 }
 
 fn setup_env(
@@ -449,8 +446,7 @@ pub extern "C" fn stage2_main(launch_info: &Stage2LaunchInfo) {
 
     check_launch_info(&launch_info);
 
-    let mem_info = memory_info();
-    print_memory_info(&mem_info);
+    print_memory_info();
 
     log::info!(
         "  kernel_region_phys_start = {:#018x}",

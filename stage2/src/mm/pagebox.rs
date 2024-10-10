@@ -1,12 +1,13 @@
+use super::alloc::{allocate, free_page};
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //
 // Copyright (C) 2024 SUSE
 //
 // Author: Carlos López <carlos.lopez@suse.com>
-use super::alloc::{allocate_pages, free_page, get_order, AllocError, MAX_ORDER};
 use super::PAGE_SIZE;
 use crate::address::VirtAddr;
 use crate::error::SvsmError;
+use core::alloc::Layout;
 use core::borrow;
 use core::marker::PhantomData;
 use core::mem::{self, ManuallyDrop, MaybeUninit};
@@ -65,20 +66,11 @@ impl<T> PageBox<T> {
         Ok(pages)
     }
 
-    /// Gets the page order required for an allocation to hold a `T`. It also
-    /// checks that the size and alignment requirements of the type can be
-    /// serviced.
-    const fn get_order() -> usize {
-        check_size_requirements::<T>();
-        let order = get_order(mem::size_of::<T>());
-        assert!(order < MAX_ORDER);
-        order
-    }
-
     /// Allocates enough pages to hold a `T`, but does not initialize them.
     pub fn try_new_uninit() -> Result<PageBox<MaybeUninit<T>>, SvsmError> {
-        let order = const { Self::get_order() };
-        let addr = NonNull::new(allocate_pages(order)?.as_mut_ptr()).unwrap();
+        let layout = Layout::new::<T>();
+        let layout = layout.align_to(PAGE_SIZE).map_err(|_| SvsmError::Mem)?;
+        let addr = NonNull::new(allocate(layout)?.as_mut_ptr()).unwrap();
         unsafe { Ok(PageBox::from_raw(addr)) }
     }
 }
@@ -142,13 +134,9 @@ impl<T: Clone> PageBox<[T]> {
     /// type `T`. The slice cannot be resized.
     pub fn try_new_uninit_slice(len: NonZeroUsize) -> Result<PageBox<[MaybeUninit<T>]>, SvsmError> {
         const { check_size_requirements::<MaybeUninit<T>>() };
-        let order = len
-            .get()
-            .checked_mul(mem::size_of::<MaybeUninit<T>>())
-            .map(get_order)
-            .filter(|order| *order < MAX_ORDER)
-            .ok_or(AllocError::OutOfMemory)?;
-        let raw = NonNull::new(allocate_pages(order)?.as_mut_ptr()).unwrap();
+        let layout = Layout::array::<T>(len.get()).map_err(|_| SvsmError::Mem)?;
+        let layout = layout.align_to(PAGE_SIZE).map_err(|_| SvsmError::Mem)?;
+        let raw = NonNull::new(allocate(layout)?.as_mut_ptr()).unwrap();
         let ptr = NonNull::slice_from_raw_parts(raw, len.get());
         Ok(PageBox {
             ptr,
