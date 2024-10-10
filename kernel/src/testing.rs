@@ -99,3 +99,6 @@ fn exit() -> ! {
         .unwrap();
     unreachable!();
 }
+
+#[test]
+fn test_nop() {}

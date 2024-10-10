@@ -7,11 +7,12 @@ rust-version = "1.80.0"
 [[bin]]
 name = "svsm"
 path = "src/svsm.rs"
-test = false
-
-[lib]
 test = true
 doctest = true
+
+# [lib]
+# test = true
+# doctest = true
 
 [dependencies]
 bootlib.workspace = true

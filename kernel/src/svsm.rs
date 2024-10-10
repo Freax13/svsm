@@ -4,53 +4,89 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-#![cfg_attr(not(test), no_std)]
-#![cfg_attr(not(test), no_main)]
+#![cfg_attr(any(not(test), test_in_svsm), no_std)]
+#![cfg_attr(any(not(test), test_in_svsm), no_main)]
+#![cfg_attr(all(test, test_in_svsm), feature(custom_test_frameworks))]
+#![cfg_attr(all(test, test_in_svsm), test_runner(crate::testing::svsm_test_runner))]
+#![cfg_attr(all(test, test_in_svsm), reexport_test_harness_main = "test_main")]
 
-use svsm::fw_meta::{print_fw_meta, validate_fw_memory, SevFWMetaData};
+pub mod acpi;
+pub mod address;
+pub mod config;
+pub mod console;
+pub mod cpu;
+pub mod crypto;
+pub mod debug;
+pub mod error;
+pub mod fs;
+pub mod fw_cfg;
+pub mod fw_meta;
+pub mod greq;
+pub mod igvm_params;
+pub mod insn_decode;
+pub mod io;
+pub mod kernel_region;
+pub mod locking;
+pub mod mm;
+pub mod platform;
+pub mod protocols;
+pub mod requests;
+pub mod serial;
+pub mod sev;
+pub mod string;
+pub mod svsm_console;
+pub mod svsm_paging;
+pub mod syscall;
+pub mod task;
+#[cfg(all(test, test_in_svsm))]
+pub mod testing;
+pub mod types;
+pub mod utils;
+#[cfg(all(feature = "mstpm", not(test)))]
+pub mod vtpm; // Include a module containing the test runner.
 
+use crate::address::{PhysAddr, VirtAddr};
+use crate::config::SvsmConfig;
+use crate::console::install_console_logger;
+use crate::cpu::control_regs::{cr0_init, cr4_init};
+use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
+use crate::cpu::gdt;
+use crate::cpu::idt::svsm::{early_idt_init, idt_init};
+use crate::cpu::percpu::current_ghcb;
+use crate::cpu::percpu::PerCpu;
+use crate::cpu::percpu::{this_cpu, this_cpu_shared};
+use crate::cpu::smp::start_secondary_cpus;
+use crate::debug::gdbstub::svsm_gdbstub::{debug_break, gdbstub_start};
+use crate::debug::stacktrace::print_stack;
+use crate::error::SvsmError;
+use crate::fs::{initialize_fs, populate_ram_fs};
+use crate::fw_cfg::FwCfg;
+use crate::fw_meta::{print_fw_meta, validate_fw_memory, SevFWMetaData};
+use crate::igvm_params::IgvmParams;
+use crate::kernel_region::new_kernel_region;
+use crate::mm::alloc::{memory_info, print_memory_info, root_mem_init};
+use crate::mm::memory::{init_memory_map, write_guest_memory_map};
+use crate::mm::pagetable::paging_init;
+use crate::mm::validate::{init_valid_bitmap_ptr, migrate_valid_bitmap};
+use crate::mm::virtualrange::virt_log_usage;
+use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange, PerCPUPageMappingGuard};
+use crate::platform::{SvsmPlatformCell, SVSM_PLATFORM};
+use crate::requests::{request_loop, request_processing_main, update_mappings};
+use crate::sev::utils::{rmp_adjust, RMPFlags};
+use crate::sev::{secrets_page, secrets_page_mut};
+use crate::svsm_paging::{init_page_table, invalidate_early_boot_memory};
+use crate::task::exec_user;
+use crate::task::{create_kernel_task, schedule_init};
+use crate::types::{PageSize, GUEST_VMPL, PAGE_SIZE};
+use crate::utils::{halt, immut_after_init::ImmutAfterInitCell, zero_mem_region};
+#[cfg(all(feature = "mstpm", not(test)))]
+use crate::vtpm::vtpm_init;
 use bootlib::kernel_launch::KernelLaunchInfo;
 use core::arch::global_asm;
 use core::panic::PanicInfo;
 use core::ptr;
 use core::slice;
 use cpuarch::snp_cpuid::SnpCpuidTable;
-use svsm::address::{PhysAddr, VirtAddr};
-use svsm::config::SvsmConfig;
-use svsm::console::install_console_logger;
-use svsm::cpu::control_regs::{cr0_init, cr4_init};
-use svsm::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
-use svsm::cpu::gdt;
-use svsm::cpu::idt::svsm::{early_idt_init, idt_init};
-use svsm::cpu::percpu::current_ghcb;
-use svsm::cpu::percpu::PerCpu;
-use svsm::cpu::percpu::{this_cpu, this_cpu_shared};
-use svsm::cpu::smp::start_secondary_cpus;
-use svsm::debug::gdbstub::svsm_gdbstub::{debug_break, gdbstub_start};
-use svsm::debug::stacktrace::print_stack;
-use svsm::error::SvsmError;
-use svsm::fs::{initialize_fs, populate_ram_fs};
-use svsm::fw_cfg::FwCfg;
-use svsm::igvm_params::IgvmParams;
-use svsm::kernel_region::new_kernel_region;
-use svsm::mm::alloc::{memory_info, print_memory_info, root_mem_init};
-use svsm::mm::memory::{init_memory_map, write_guest_memory_map};
-use svsm::mm::pagetable::paging_init;
-use svsm::mm::virtualrange::virt_log_usage;
-use svsm::mm::{init_kernel_mapping_info, FixedAddressMappingRange, PerCPUPageMappingGuard};
-use svsm::platform::{SvsmPlatformCell, SVSM_PLATFORM};
-use svsm::requests::{request_loop, request_processing_main, update_mappings};
-use svsm::sev::utils::{rmp_adjust, RMPFlags};
-use svsm::sev::{secrets_page, secrets_page_mut};
-use svsm::svsm_paging::{init_page_table, invalidate_early_boot_memory};
-use svsm::task::exec_user;
-use svsm::task::{create_kernel_task, schedule_init};
-use svsm::types::{PageSize, GUEST_VMPL, PAGE_SIZE};
-use svsm::utils::{halt, immut_after_init::ImmutAfterInitCell, zero_mem_region};
-#[cfg(all(feature = "mstpm", not(test)))]
-use svsm::vtpm::vtpm_init;
-
-use svsm::mm::validate::{init_valid_bitmap_ptr, migrate_valid_bitmap};
 
 extern "C" {
     pub static bsp_stack_end: u8;
@@ -456,7 +492,7 @@ pub extern "C" fn svsm_main() {
 
     create_kernel_task(request_processing_main).expect("Failed to launch request processing task");
 
-    #[cfg(test)]
+    #[cfg(all(test, test_in_svsm))]
     crate::test_main();
 
     if exec_user("/init").is_err() {
@@ -468,6 +504,7 @@ pub extern "C" fn svsm_main() {
     panic!("Road ends here!");
 }
 
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
     secrets_page_mut().clear_vmpck(0);

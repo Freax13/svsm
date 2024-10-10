@@ -19,6 +19,7 @@ struct GDTDesc {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
+#[repr(transparent)]
 pub struct GDTEntry(u64);
 
 impl GDTEntry {
@@ -54,6 +55,7 @@ impl GDTEntry {
 const GDT_SIZE: u16 = 8;
 
 #[derive(Copy, Clone, Debug, Default)]
+#[repr(transparent)]
 pub struct GDT {
     entries: [GDTEntry; GDT_SIZE as usize],
 }

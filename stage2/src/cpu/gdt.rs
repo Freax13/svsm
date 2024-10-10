@@ -16,6 +16,7 @@ struct GDTDesc {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
+#[repr(transparent)]
 pub struct GDTEntry(u64);
 
 impl GDTEntry {
@@ -47,11 +48,12 @@ impl GDTEntry {
 const GDT_SIZE: u16 = 8;
 
 #[derive(Copy, Clone, Debug, Default)]
-pub struct GDT {
+#[repr(transparent)]
+pub struct Gdt {
     entries: [GDTEntry; GDT_SIZE as usize],
 }
 
-impl GDT {
+impl Gdt {
     pub const fn new() -> Self {
         Self {
             entries: [
@@ -104,4 +106,4 @@ impl GDT {
     }
 }
 
-pub static GDT: GDT = GDT::new();
+pub static GDT: Gdt = Gdt::new();
