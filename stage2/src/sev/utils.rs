@@ -15,7 +15,6 @@ use core::fmt;
 #[allow(non_camel_case_types)]
 pub enum SevSnpError {
     FAIL_INPUT(u64),
-    FAIL_PERMISSION(u64),
     FAIL_SIZEMISMATCH(u64),
     // Not a real error value, but we want to keep track of this,
     // especially for protocol-specific messaging
@@ -32,10 +31,9 @@ impl SevSnpError {
     // This should get optimized away by the compiler to a single instruction
     pub fn ret(&self) -> u64 {
         match self {
-            Self::FAIL_INPUT(ret)
-            | Self::FAIL_UNCHANGED(ret)
-            | Self::FAIL_PERMISSION(ret)
-            | Self::FAIL_SIZEMISMATCH(ret) => *ret,
+            Self::FAIL_INPUT(ret) | Self::FAIL_UNCHANGED(ret) | Self::FAIL_SIZEMISMATCH(ret) => {
+                *ret
+            }
         }
     }
 }
@@ -45,7 +43,6 @@ impl fmt::Display for SevSnpError {
         match self {
             Self::FAIL_INPUT(_) => write!(f, "FAIL_INPUT"),
             Self::FAIL_UNCHANGED(_) => write!(f, "FAIL_UNCHANGED"),
-            Self::FAIL_PERMISSION(_) => write!(f, "FAIL_PERMISSION"),
             Self::FAIL_SIZEMISMATCH(_) => write!(f, "FAIL_SIZEMISMATCH"),
         }
     }

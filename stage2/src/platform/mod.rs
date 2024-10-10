@@ -11,7 +11,6 @@ use crate::platform::native::NativePlatform;
 use crate::platform::snp::SnpPlatform;
 use crate::platform::tdp::TdpPlatform;
 use crate::types::PageSize;
-use crate::utils::immut_after_init::ImmutAfterInitCell;
 use crate::utils::MemoryRegion;
 
 use bootlib::platform::SvsmPlatformType;
@@ -19,8 +18,6 @@ use bootlib::platform::SvsmPlatformType;
 pub mod native;
 pub mod snp;
 pub mod tdp;
-
-pub static SVSM_PLATFORM: ImmutAfterInitCell<SvsmPlatformCell> = ImmutAfterInitCell::uninit();
 
 #[derive(Clone, Copy, Debug)]
 pub struct PageEncryptionMasks {

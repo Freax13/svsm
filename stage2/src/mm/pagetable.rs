@@ -6,8 +6,6 @@
 
 use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::flush_tlb_global_sync;
-use crate::cpu::idt::common::PageFaultError;
-use crate::cpu::registers::RFlags;
 use crate::error::SvsmError;
 use crate::mm::alloc::allocate_page_zeroed;
 use crate::mm::{phys_to_virt, virt_to_phys};
@@ -15,7 +13,6 @@ use crate::platform::SvsmPlatform;
 use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::immut_after_init::{ImmutAfterInitCell, ImmutAfterInitResult};
 use crate::utils::MemoryRegion;
-use crate::BIT_MASK;
 use bitflags::bitflags;
 use core::cmp;
 use core::ops::{Index, IndexMut};
@@ -638,16 +635,6 @@ impl PageTable {
         }
     }
 
-    /// Gets the physical address for a mapped `vaddr` or `None` if
-    /// no such mapping exists.
-    pub fn check_mapping(&mut self, vaddr: VirtAddr) -> Option<PhysAddr> {
-        match self.walk_addr(vaddr) {
-            Mapping::Level0(entry) => Some(entry.address()),
-            Mapping::Level1(entry) => Some(entry.address()),
-            _ => None,
-        }
-    }
-
     /// Maps a 2MB page.
     ///
     /// # Parameters
@@ -736,40 +723,6 @@ impl PageTable {
             Mapping::Level1(entry) => assert!(!entry.present()),
             Mapping::Level2(entry) => assert!(!entry.present()),
             Mapping::Level3(entry) => assert!(!entry.present()),
-        }
-    }
-
-    /// Retrieves the physical address of a mapping.
-    ///
-    /// # Parameters
-    /// - `vaddr`: The virtual address to query.
-    ///
-    /// # Returns
-    /// The physical address of the mapping if present; otherwise, an error
-    /// ([`SvsmError`]).
-    pub fn phys_addr(&mut self, vaddr: VirtAddr) -> Result<PhysAddr, SvsmError> {
-        let mapping = self.walk_addr(vaddr);
-
-        match mapping {
-            Mapping::Level0(entry) => {
-                let offset = vaddr.page_offset();
-                if !entry.flags().contains(PTEntryFlags::PRESENT) {
-                    return Err(SvsmError::Mem);
-                }
-                Ok(entry.address() + offset)
-            }
-            Mapping::Level1(entry) => {
-                let offset = vaddr.bits() & (PAGE_SIZE_2M - 1);
-                if !entry.flags().contains(PTEntryFlags::PRESENT)
-                    || !entry.flags().contains(PTEntryFlags::HUGE)
-                {
-                    return Err(SvsmError::Mem);
-                }
-
-                Ok(entry.address() + offset)
-            }
-            Mapping::Level2(_entry) => Err(SvsmError::Mem),
-            Mapping::Level3(_entry) => Err(SvsmError::Mem),
         }
     }
 

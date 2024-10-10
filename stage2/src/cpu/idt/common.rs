@@ -6,14 +6,12 @@
 
 use crate::address::{Address, VirtAddr};
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
-use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
+use crate::locking::{RWLock, WriteLockGuard};
 use crate::types::SVSM_CS;
 use core::arch::{asm, global_asm};
-use core::mem;
 
 pub const DF_VECTOR: usize = 8;
 pub const HV_VECTOR: usize = 28;
-pub const VC_VECTOR: usize = 29;
 
 bitflags::bitflags! {
     /// Page fault error code flags.
@@ -181,14 +179,6 @@ impl WriteLockGuard<'static, IDT> {
         unsafe {
             asm!("lidt (%rax)", in("rax") &desc, options(att_syntax));
         }
-    }
-}
-
-impl ReadLockGuard<'static, IDT> {
-    pub fn base_limit(&self) -> (u64, u32) {
-        let base: *const IDT = core::ptr::from_ref(self);
-        let limit = (IDT_ENTRIES * mem::size_of::<IdtEntry>()) as u32;
-        (base as u64, limit)
     }
 }
 

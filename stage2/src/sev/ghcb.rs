@@ -91,19 +91,8 @@ impl From<GhcbError> for SvsmError {
 #[repr(u64)]
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 enum GHCBExitCode {
-    RDTSC = 0x6e,
     IOIO = 0x7b,
-    MSR = 0x7c,
-    RDTSCP = 0x87,
     SNP_PSC = 0x8000_0010,
-    GUEST_REQUEST = 0x8000_0011,
-    GUEST_EXT_REQUEST = 0x8000_0012,
-    AP_CREATE = 0x80000013,
-    HV_DOORBELL = 0x8000_0014,
-    HV_IPI = 0x8000_0015,
-    CONFIGURE_INT_INJ = 0x8000_0019,
-    DISABLE_ALT_INJ = 0x8000_001A,
-    SPECIFIC_EOI = 0x8000_001B,
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -8,8 +8,6 @@ use crate::types::PAGE_SIZE;
 use core::fmt;
 use core::ops;
 
-use core::slice;
-
 // The backing type to represent an address;
 type InnerAddr = usize;
 
@@ -51,11 +49,6 @@ pub trait Address:
     }
 
     #[inline]
-    fn page_align(&self) -> Self {
-        Self::from(self.bits() & !(PAGE_SIZE - 1))
-    }
-
-    #[inline]
     fn is_aligned(&self, align: InnerAddr) -> bool {
         (self.bits() & (align - 1)) == 0
     }
@@ -83,11 +76,6 @@ pub trait Address:
     #[inline]
     fn saturating_add(&self, off: InnerAddr) -> Self {
         Self::from(self.bits().saturating_add(off))
-    }
-
-    #[inline]
-    fn page_offset(&self) -> usize {
-        self.bits() & (PAGE_SIZE - 1)
     }
 }
 
@@ -228,40 +216,8 @@ impl VirtAddr {
             .flatten()
     }
 
-    /// Converts the `VirtAddr` to a reference to the given type, checking
-    /// that the address is not NULL and properly aligned.
-    ///
-    /// # Safety
-    ///
-    /// All safety requirements for pointers apply, minus alignment and NULL
-    /// checks, which this function already does.
-    #[inline]
-    pub unsafe fn aligned_mut<'a, T>(&self) -> Option<&'a mut T> {
-        self.is_aligned_to::<T>()
-            .then(|| self.as_mut_ptr::<T>().as_mut())
-            .flatten()
-    }
-
     pub const fn const_add(&self, offset: usize) -> Self {
         VirtAddr::new(self.0 + offset)
-    }
-
-    /// Converts the `VirtAddr` to a slice of a given type
-    ///
-    /// # Arguments:
-    ///
-    /// * `len` - Number of elements of type `T` in the slice
-    ///
-    /// # Returns
-    ///
-    /// Slice with `len` elements of type `T`
-    ///
-    /// # Safety
-    ///
-    /// All Safety requirements from [`core::slice::from_raw_parts`] for the
-    /// data pointed to by the `VirtAddr` apply here as well.
-    pub unsafe fn to_slice<T>(&self, len: usize) -> &[T] {
-        slice::from_raw_parts::<T>(self.as_ptr::<T>(), len)
     }
 }
 

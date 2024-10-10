@@ -9,4 +9,4 @@ pub mod memory_region;
 pub mod util;
 
 pub use memory_region::MemoryRegion;
-pub use util::{align_down, align_up, halt, is_aligned};
+pub use util::{halt, is_aligned};

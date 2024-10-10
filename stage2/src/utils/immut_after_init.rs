@@ -256,41 +256,11 @@ impl<'a, T: Copy> ImmutAfterInitRef<'a, T> {
         self.ptr.init(&(r as *const T))
     }
 
-    /// Create an initialized `ImmutAfterInitRef` instance pointing to a value
-    /// specified by a regular reference.
-    ///
-    /// * `r` - Reference to the value to make the `ImmutAfterInitRef` to refer
-    ///         to. By convention, the referenced value must have been
-    ///         initialized already.
-    pub const fn new_from_ref(r: &'a T) -> Self {
-        Self {
-            ptr: ImmutAfterInitCell::new(r as *const T),
-            _phantom: PhantomData,
-        }
-    }
-
     /// Dereference the referenced value with lifetime propagation. Must **only
     /// ever** get called on an initialized `ImmutAfterInitRef` instance! Moreover,
     /// the value referenced must have been initialized as well.
     pub fn get(&self) -> &'a T {
         unsafe { &**self.ptr }
-    }
-}
-
-impl<'a, T: Copy> ImmutAfterInitRef<'a, T> {
-    /// Initialize an uninitialized `ImmutAfterInitRef` instance to point to
-    /// value wrapped in a [`ImmutAfterInitCell`].
-    ///
-    /// Must **not** get called on an already initialized `ImmutAfterInitRef` instance!
-    ///
-    /// * `cell` - The value to make the `ImmutAfterInitRef` to refer to. By
-    ///            convention, the referenced value must have been initialized
-    ///            already.
-    pub fn init_from_cell<'b>(&self, cell: &'b ImmutAfterInitCell<T>) -> ImmutAfterInitResult<()>
-    where
-        'b: 'a,
-    {
-        self.ptr.init(&(cell.try_get_inner()? as *const T))
     }
 }
 

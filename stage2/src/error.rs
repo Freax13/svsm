@@ -48,8 +48,6 @@ pub enum SvsmError {
     Console,
     /// Errors related to firmware configuration contents
     FwCfg(FwCfgError),
-    /// Errors related to ACPI parsing.
-    Acpi,
 }
 
 impl From<ElfError> for SvsmError {
