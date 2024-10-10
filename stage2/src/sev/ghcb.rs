@@ -5,9 +5,9 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::address::{Address, PhysAddr, VirtAddr};
+use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::msr::{write_msr, SEV_GHCB};
 use crate::cpu::percpu::this_cpu;
-use crate::cpu::{flush_tlb_global_sync, X86GeneralRegs};
 use crate::error::SvsmError;
 use crate::mm::validate::{
     valid_bitmap_clear_valid_4k, valid_bitmap_set_valid_4k, valid_bitmap_valid_addr,
@@ -16,7 +16,7 @@ use crate::mm::virt_to_phys;
 use crate::platform::PageStateChangeOp;
 use crate::sev::sev_snp_enabled;
 use crate::sev::utils::raw_vmgexit;
-use crate::types::{Bytes, PageSize, GUEST_VMPL, PAGE_SIZE_2M};
+use crate::types::{Bytes, PageSize, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 
 use crate::mm::PageBox;
@@ -269,60 +269,6 @@ impl GHCB {
     ghcb_getter!(get_usage_valid, usage, u32);
     ghcb_setter!(set_usage_valid, usage, u32);
 
-    pub fn rdtscp_regs(&self, regs: &mut X86GeneralRegs) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::RDTSCP, 0, 0)?;
-        let rax = self.get_rax_valid()?;
-        let rdx = self.get_rdx_valid()?;
-        let rcx = self.get_rcx_valid()?;
-        regs.rax = rax as usize;
-        regs.rdx = rdx as usize;
-        regs.rcx = rcx as usize;
-        Ok(())
-    }
-
-    pub fn rdtsc_regs(&self, regs: &mut X86GeneralRegs) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::RDTSC, 0, 0)?;
-        let rax = self.get_rax_valid()?;
-        let rdx = self.get_rdx_valid()?;
-        regs.rax = rax as usize;
-        regs.rdx = rdx as usize;
-        Ok(())
-    }
-
-    pub fn wrmsr(&self, msr_index: u32, value: u64) -> Result<(), SvsmError> {
-        self.wrmsr_raw(msr_index as u64, value & 0xFFFF_FFFF, value >> 32)
-    }
-
-    pub fn wrmsr_regs(&self, regs: &X86GeneralRegs) -> Result<(), SvsmError> {
-        self.wrmsr_raw(regs.rcx as u64, regs.rax as u64, regs.rdx as u64)
-    }
-
-    pub fn wrmsr_raw(&self, rcx: u64, rax: u64, rdx: u64) -> Result<(), SvsmError> {
-        self.clear();
-
-        self.set_rcx_valid(rcx);
-        self.set_rax_valid(rax);
-        self.set_rdx_valid(rdx);
-
-        self.vmgexit(GHCBExitCode::MSR, 1, 0)?;
-        Ok(())
-    }
-
-    pub fn rdmsr_regs(&self, regs: &mut X86GeneralRegs) -> Result<(), SvsmError> {
-        self.clear();
-
-        self.set_rcx_valid(regs.rcx as u64);
-
-        self.vmgexit(GHCBExitCode::MSR, 0, 0)?;
-        let rdx = self.get_rdx_valid()?;
-        let rax = self.get_rax_valid()?;
-        regs.rdx = rdx as usize;
-        regs.rax = rax as usize;
-        Ok(())
-    }
-
     pub fn register(&self) -> Result<(), SvsmError> {
         let vaddr = VirtAddr::from(self as *const GHCB);
         let paddr = virt_to_phys(vaddr);
@@ -528,132 +474,6 @@ impl GHCB {
             }
         }
 
-        Ok(())
-    }
-
-    pub fn ap_create(
-        &self,
-        vmsa_gpa: PhysAddr,
-        apic_id: u64,
-        vmpl: u64,
-        sev_features: u64,
-    ) -> Result<(), SvsmError> {
-        self.clear();
-        let exit_info_1: u64 = 1 | (vmpl & 0xf) << 16 | apic_id << 32;
-        let exit_info_2: u64 = vmsa_gpa.into();
-        self.set_rax_valid(sev_features);
-        self.vmgexit(GHCBExitCode::AP_CREATE, exit_info_1, exit_info_2)?;
-        Ok(())
-    }
-
-    pub fn register_guest_vmsa(
-        &self,
-        vmsa_gpa: PhysAddr,
-        apic_id: u64,
-        vmpl: u64,
-        sev_features: u64,
-    ) -> Result<(), SvsmError> {
-        self.clear();
-        let exit_info_1: u64 = (vmpl & 0xf) << 16 | apic_id << 32;
-        let exit_info_2: u64 = vmsa_gpa.into();
-        self.set_rax_valid(sev_features);
-        self.vmgexit(GHCBExitCode::AP_CREATE, exit_info_1, exit_info_2)?;
-        Ok(())
-    }
-
-    pub fn register_hv_doorbell(&self, paddr: PhysAddr) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::HV_DOORBELL, 1, u64::from(paddr))?;
-        Ok(())
-    }
-
-    pub fn guest_request(&self, req_page: VirtAddr, resp_page: VirtAddr) -> Result<(), SvsmError> {
-        self.clear();
-
-        let info1: u64 = u64::from(virt_to_phys(req_page));
-        let info2: u64 = u64::from(virt_to_phys(resp_page));
-
-        self.vmgexit(GHCBExitCode::GUEST_REQUEST, info1, info2)?;
-
-        let sw_exit_info_2 = self.get_exit_info_2_valid()?;
-        if sw_exit_info_2 != 0 {
-            return Err(GhcbError::VmgexitError(
-                self.sw_exit_info_1.load(Ordering::Relaxed),
-                sw_exit_info_2,
-            )
-            .into());
-        }
-
-        Ok(())
-    }
-
-    pub fn guest_ext_request(
-        &self,
-        req_page: VirtAddr,
-        resp_page: VirtAddr,
-        data_pages: VirtAddr,
-        data_size: u64,
-    ) -> Result<(), SvsmError> {
-        self.clear();
-
-        let info1: u64 = u64::from(virt_to_phys(req_page));
-        let info2: u64 = u64::from(virt_to_phys(resp_page));
-        let rax: u64 = u64::from(virt_to_phys(data_pages));
-
-        self.set_rax_valid(rax);
-        self.set_rbx_valid(data_size);
-
-        self.vmgexit(GHCBExitCode::GUEST_EXT_REQUEST, info1, info2)?;
-
-        let sw_exit_info_2 = self.get_exit_info_2_valid()?;
-
-        // On error, RBX and exit_info_2 are returned for proper error handling.
-        // For an extended request, if the buffer provided is too small, the hypervisor
-        // will return in RBX the number of contiguous pages required
-        if sw_exit_info_2 != 0 {
-            return Err(
-                GhcbError::VmgexitError(self.rbx.load(Ordering::Relaxed), sw_exit_info_2).into(),
-            );
-        }
-
-        Ok(())
-    }
-
-    pub fn hv_ipi(&self, icr: u64) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::HV_IPI, icr, 0)?;
-        Ok(())
-    }
-
-    pub fn configure_interrupt_injection(&self, vector: usize) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::CONFIGURE_INT_INJ, vector as u64, 0)?;
-        Ok(())
-    }
-
-    pub fn specific_eoi(&self, vector: u8, vmpl: u8) -> Result<(), SvsmError> {
-        self.clear();
-        let exit_info = ((vmpl as u64) << 16) | (vector as u64);
-        self.vmgexit(GHCBExitCode::SPECIFIC_EOI, exit_info, 0)?;
-        Ok(())
-    }
-
-    pub fn disable_alternate_injection(
-        &self,
-        tpr: u8,
-        in_intr_shadow: bool,
-        interrupts_enabled: bool,
-    ) -> Result<(), SvsmError> {
-        let mut exit_info = (GUEST_VMPL as u64) << 16;
-        exit_info |= (tpr as u64) << 8;
-        if in_intr_shadow {
-            exit_info |= 2;
-        }
-        if interrupts_enabled {
-            exit_info |= 1;
-        }
-        self.clear();
-        self.vmgexit(GHCBExitCode::DISABLE_ALT_INJ, exit_info, 0)?;
         Ok(())
     }
 }
