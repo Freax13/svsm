@@ -5,9 +5,9 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::address::{Address, PhysAddr, VirtAddr};
+use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::msr::{write_msr, SEV_GHCB};
 use crate::cpu::percpu::this_cpu;
-use crate::cpu::{flush_tlb_global_sync, X86GeneralRegs};
 use crate::error::SvsmError;
 use crate::mm::validate::{
     valid_bitmap_clear_valid_4k, valid_bitmap_set_valid_4k, valid_bitmap_valid_addr,
@@ -265,60 +265,6 @@ impl GHCB {
 
     ghcb_getter!(get_usage_valid, usage, u32);
     ghcb_setter!(set_usage_valid, usage, u32);
-
-    pub fn rdtscp_regs(&self, regs: &mut X86GeneralRegs) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::RDTSCP, 0, 0)?;
-        let rax = self.get_rax_valid()?;
-        let rdx = self.get_rdx_valid()?;
-        let rcx = self.get_rcx_valid()?;
-        regs.rax = rax as usize;
-        regs.rdx = rdx as usize;
-        regs.rcx = rcx as usize;
-        Ok(())
-    }
-
-    pub fn rdtsc_regs(&self, regs: &mut X86GeneralRegs) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::RDTSC, 0, 0)?;
-        let rax = self.get_rax_valid()?;
-        let rdx = self.get_rdx_valid()?;
-        regs.rax = rax as usize;
-        regs.rdx = rdx as usize;
-        Ok(())
-    }
-
-    pub fn wrmsr(&self, msr_index: u32, value: u64) -> Result<(), SvsmError> {
-        self.wrmsr_raw(msr_index as u64, value & 0xFFFF_FFFF, value >> 32)
-    }
-
-    pub fn wrmsr_regs(&self, regs: &X86GeneralRegs) -> Result<(), SvsmError> {
-        self.wrmsr_raw(regs.rcx as u64, regs.rax as u64, regs.rdx as u64)
-    }
-
-    pub fn wrmsr_raw(&self, rcx: u64, rax: u64, rdx: u64) -> Result<(), SvsmError> {
-        self.clear();
-
-        self.set_rcx_valid(rcx);
-        self.set_rax_valid(rax);
-        self.set_rdx_valid(rdx);
-
-        self.vmgexit(GHCBExitCode::MSR, 1, 0)?;
-        Ok(())
-    }
-
-    pub fn rdmsr_regs(&self, regs: &mut X86GeneralRegs) -> Result<(), SvsmError> {
-        self.clear();
-
-        self.set_rcx_valid(regs.rcx as u64);
-
-        self.vmgexit(GHCBExitCode::MSR, 0, 0)?;
-        let rdx = self.get_rdx_valid()?;
-        let rax = self.get_rax_valid()?;
-        regs.rdx = rdx as usize;
-        regs.rax = rax as usize;
-        Ok(())
-    }
 
     pub fn register(&self) -> Result<(), SvsmError> {
         let vaddr = VirtAddr::from(self as *const GHCB);
