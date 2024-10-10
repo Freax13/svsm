@@ -31,21 +31,6 @@ impl From<PageSize> for usize {
 #[expect(clippy::identity_op)]
 pub const SVSM_CS: u16 = 1 * 8;
 pub const SVSM_DS: u16 = 2 * 8;
-pub const SVSM_USER_CS: u16 = 3 * 8;
-pub const SVSM_USER_DS: u16 = 4 * 8;
-pub const SVSM_TSS: u16 = 6 * 8;
-
-pub const SVSM_CS_FLAGS: u16 = 0x29b;
-pub const SVSM_DS_FLAGS: u16 = 0xc93;
-pub const SVSM_TR_FLAGS: u16 = 0x89;
-
-/// VMPL level the guest OS will be executed at.
-/// Keep VMPL 1 for the SVSM and execute the OS at VMPL-2. This leaves VMPL-3
-/// free for the OS to use in the future.
-pub const GUEST_VMPL: usize = 2;
-pub const VMPL_MAX: usize = 4;
-
-const _: () = assert!(GUEST_VMPL > 0 && GUEST_VMPL < VMPL_MAX);
 
 pub const MAX_CPUS: usize = 512;
 

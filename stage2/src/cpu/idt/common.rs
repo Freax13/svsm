@@ -6,13 +6,12 @@
 
 use crate::address::{Address, VirtAddr};
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
-use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
+use crate::locking::{RWLock, WriteLockGuard};
 use crate::types::SVSM_CS;
 use core::arch::{asm, global_asm};
 
 pub const DF_VECTOR: usize = 8;
 pub const HV_VECTOR: usize = 28;
-pub const VC_VECTOR: usize = 29;
 
 bitflags::bitflags! {
     /// Page fault error code flags.

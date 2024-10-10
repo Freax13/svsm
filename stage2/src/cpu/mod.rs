@@ -17,5 +17,4 @@ pub mod registers;
 pub mod tlb;
 
 pub use idt::common::X86ExceptionContext;
-pub use registers::X86GeneralRegs;
 pub use tlb::*;

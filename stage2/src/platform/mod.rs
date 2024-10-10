@@ -24,7 +24,6 @@ pub mod snp;
 pub mod tdp;
 
 static SVSM_PLATFORM_TYPE: ImmutAfterInitCell<SvsmPlatformType> = ImmutAfterInitCell::uninit();
-pub static SVSM_PLATFORM: ImmutAfterInitCell<SvsmPlatformCell> = ImmutAfterInitCell::uninit();
 
 #[derive(Clone, Copy, Debug)]
 pub struct PageEncryptionMasks {

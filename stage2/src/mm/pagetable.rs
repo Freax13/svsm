@@ -702,6 +702,21 @@ impl PageTable {
         }
     }
 
+    /// Unmaps a 4KB page.
+    ///
+    /// # Parameters
+    /// - `vaddr`: The virtual address of the mapping to unmap.
+    pub fn unmap_4k(&mut self, vaddr: VirtAddr) {
+        let mapping = self.walk_addr(vaddr);
+
+        match mapping {
+            Mapping::Level0(entry) => entry.clear(),
+            Mapping::Level1(entry) => assert!(!entry.present()),
+            Mapping::Level2(entry) => assert!(!entry.present()),
+            Mapping::Level3(entry) => assert!(!entry.present()),
+        }
+    }
+
     /// Maps a memory region to physical memory with specified flags.
     ///
     /// # Parameters

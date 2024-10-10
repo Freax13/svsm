@@ -43,7 +43,7 @@ use crate::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
 use crate::mm::validate::{
     init_valid_bitmap_alloc, valid_bitmap_addr, valid_bitmap_set_valid_range,
 };
-use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange, SVSM_PERCPU_BASE};
+use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange};
 use crate::platform::{
     init_platform_type, PageStateChangeOp, PageValidateOp, SvsmPlatform, SvsmPlatformCell,
 };

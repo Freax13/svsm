@@ -4,8 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use core::fmt;
-
 #[derive(Copy, Clone, Debug)]
 pub struct FixedString<const T: usize> {
     len: usize,
@@ -30,34 +28,11 @@ impl<const T: usize> FixedString<T> {
         self.data[l] = c;
         self.len += 1;
     }
-
-    pub fn length(&self) -> usize {
-        self.len
-    }
 }
 
 impl<const N: usize> Default for FixedString<N> {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for FixedString<N> {
-    fn from(arr: [u8; N]) -> FixedString<N> {
-        let data = arr.map(char::from);
-        let len = arr.iter().position(|&b| b == 0).unwrap_or(N);
-        FixedString { data, len }
-    }
-}
-
-impl<const N: usize> From<&str> for FixedString<N> {
-    fn from(st: &str) -> FixedString<N> {
-        let mut fs = FixedString::new();
-        for c in st.chars().take(N) {
-            fs.data[fs.len] = c;
-            fs.len += 1;
-        }
-        fs
     }
 }
 
@@ -72,28 +47,5 @@ impl<const N: usize> PartialEq<&str> for FixedString<N> {
             }
         }
         true
-    }
-}
-
-impl<const N: usize> PartialEq<FixedString<N>> for FixedString<N> {
-    fn eq(&self, other: &FixedString<N>) -> bool {
-        if self.len != other.len {
-            return false;
-        }
-
-        self.data
-            .iter()
-            .zip(&other.data)
-            .take(self.len)
-            .all(|(a, b)| *a == *b)
-    }
-}
-
-impl<const T: usize> fmt::Display for FixedString<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for b in self.data.iter().take(self.len) {
-            write!(f, "{}", *b)?;
-        }
-        Ok(())
     }
 }

@@ -72,10 +72,6 @@ pub enum SvsmError {
     Console,
     /// Errors related to firmware configuration contents
     FwCfg(FwCfgError),
-    /// Errors related to ACPI parsing.
-    Acpi,
-    /// The operation is not supported.
-    NotSupported,
     /// Generic errors related to APIC emulation.
     Apic(ApicError),
 }
