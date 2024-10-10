@@ -6,7 +6,7 @@
 
 use crate::address::{Address, VirtAddr};
 use crate::error::SvsmError;
-use crate::types::{PageSize, GUEST_VMPL, PAGE_SIZE, PAGE_SIZE_2M};
+use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 use core::arch::asm;
 use core::fmt;
@@ -135,65 +135,5 @@ pub fn pvalidate(vaddr: VirtAddr, size: PageSize, valid: PvalidateOp) -> Result<
 pub fn raw_vmgexit() {
     unsafe {
         asm!("rep; vmmcall", options(att_syntax));
-    }
-}
-
-bitflags::bitflags! {
-    pub struct RMPFlags: u64 {
-        const VMPL0 = 0;
-        const VMPL1 = 1;
-        const VMPL2 = 2;
-        const VMPL3 = 3;
-        const GUEST_VMPL = GUEST_VMPL as u64;
-        const READ = 1u64 << 8;
-        const WRITE = 1u64 << 9;
-        const X_USER = 1u64 << 10;
-        const X_SUPER = 1u64 << 11;
-        const BIT_VMSA = 1u64 << 16;
-        const NONE = 0;
-        const RWX = Self::READ.bits() | Self::WRITE.bits() | Self::X_USER.bits() | Self::X_SUPER.bits();
-        const VMSA = Self::READ.bits() | Self::BIT_VMSA.bits();
-    }
-}
-
-pub fn rmp_adjust(addr: VirtAddr, flags: RMPFlags, size: PageSize) -> Result<(), SvsmError> {
-    let rcx: u64 = match size {
-        PageSize::Regular => 0,
-        PageSize::Huge => 1,
-    };
-    let rax: u64 = addr.bits() as u64;
-    let rdx: u64 = flags.bits();
-    let mut ret: u64;
-    let mut ex: u64;
-
-    unsafe {
-        asm!("1: .byte 0xf3, 0x0f, 0x01, 0xfe
-                 xorq %rcx, %rcx
-              2:
-              .pushsection \"__exception_table\",\"a\"
-              .balign 16
-              .quad (1b)
-              .quad (2b)
-              .popsection",
-                inout("rax") rax => ret,
-                inout("rcx") rcx => ex,
-                in("rdx") rdx,
-                options(att_syntax));
-    }
-
-    if ex != 0 {
-        // Report exceptions just as FAIL_INPUT
-        return Err(SevSnpError::FAIL_INPUT(1).into());
-    }
-
-    match ret {
-        0 => Ok(()),
-        1 => Err(SevSnpError::FAIL_INPUT(ret).into()),
-        2 => Err(SevSnpError::FAIL_PERMISSION(ret).into()),
-        6 => Err(SevSnpError::FAIL_SIZEMISMATCH(ret).into()),
-        _ => {
-            log::error!("RMPADJUST: Unexpected return value: {:#x}", ret);
-            unreachable!();
-        }
     }
 }
