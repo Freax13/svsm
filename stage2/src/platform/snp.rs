@@ -32,7 +32,6 @@ impl From<PageValidateOp> for PvalidateOp {
     fn from(op: PageValidateOp) -> PvalidateOp {
         match op {
             PageValidateOp::Validate => PvalidateOp::Valid,
-            PageValidateOp::Invalidate => PvalidateOp::Invalid,
         }
     }
 }

@@ -41,9 +41,6 @@ const PSC_GFN_MASK: u64 = ((1u64 << 52) - 1) & !0xfffu64;
 
 const PSC_OP_SHIFT: u8 = 52;
 const PSC_OP_PRIVATE: u64 = 1 << PSC_OP_SHIFT;
-const PSC_OP_SHARED: u64 = 2 << PSC_OP_SHIFT;
-const PSC_OP_PSMASH: u64 = 3 << PSC_OP_SHIFT;
-const PSC_OP_UNSMASH: u64 = 4 << PSC_OP_SHIFT;
 
 const PSC_FLAG_HUGE_SHIFT: u8 = 56;
 const PSC_FLAG_HUGE: u64 = 1 << PSC_FLAG_HUGE_SHIFT;
@@ -405,9 +402,6 @@ impl GHCB {
         let end = region.end();
         let op_mask: u64 = match op {
             PageStateChangeOp::Private => PSC_OP_PRIVATE,
-            PageStateChangeOp::Shared => PSC_OP_SHARED,
-            PageStateChangeOp::Psmash => PSC_OP_PSMASH,
-            PageStateChangeOp::Unsmash => PSC_OP_UNSMASH,
         };
 
         self.clear();

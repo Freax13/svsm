@@ -30,15 +30,11 @@ pub struct PageEncryptionMasks {
 #[derive(Debug, Clone, Copy)]
 pub enum PageStateChangeOp {
     Private,
-    Shared,
-    Psmash,
-    Unsmash,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum PageValidateOp {
     Validate,
-    Invalidate,
 }
 
 /// This defines a platform abstraction to permit the SVSM to run on different
