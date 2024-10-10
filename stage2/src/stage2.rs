@@ -33,7 +33,7 @@ use crate::console::install_console_logger;
 use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
 use crate::cpu::gdt::GDT;
 use crate::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
-use crate::cpu::percpu::{this_cpu, PerCpu};
+use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::fw_cfg::FwCfg;
 use crate::igvm_params::IgvmParams;
@@ -49,15 +49,14 @@ use crate::utils::{halt, is_aligned, MemoryRegion};
 use bootlib::kernel_launch::{KernelLaunchInfo, Stage2LaunchInfo};
 use bootlib::platform::SvsmPlatformType;
 use core::arch::asm;
+use core::ops::{Deref, DerefMut};
 use core::panic::PanicInfo;
-use core::ptr::addr_of_mut;
+use core::ptr::{addr_of, addr_of_mut};
 use core::slice;
 use cpuarch::snp_cpuid::SnpCpuidTable;
 use elf::ElfError;
-
-extern "C" {
-    static mut pgtable: PageTable;
-}
+use locking::spinlock::LockGuard;
+use locking::SpinLock;
 
 fn setup_stage2_allocator(heap_start: u64, heap_end: u64) {
     let vstart = VirtAddr::from(heap_start);
@@ -70,12 +69,6 @@ fn setup_stage2_allocator(heap_start: u64, heap_end: u64) {
 
 fn init_percpu(platform: &mut dyn SvsmPlatform) -> Result<(), SvsmError> {
     let bsp_percpu = PerCpu::alloc()?;
-    let init_pgtable = unsafe {
-        // SAFETY: pgtable is a static mut and this is the only place where we
-        // get a reference to it.
-        &mut *addr_of_mut!(pgtable)
-    };
-    bsp_percpu.set_pgtable(init_pgtable);
     bsp_percpu.map_self_stage2()?;
     platform.setup_guest_host_comm(bsp_percpu, true);
     Ok(())
@@ -150,6 +143,33 @@ fn setup_env(
     dump_cpuid_table();
 }
 
+fn pgtable() -> LockGuard<'static, impl DerefMut<Target = PageTable>> {
+    extern "C" {
+        static mut pgtable: PageTable;
+    }
+
+    // Rust won't let us create a mutable reference to `pgtable` in a static
+    // variable. Instead use a custom pointer type that can be dereferenced
+    // into `pgtable`.
+    // TODO: Remove this once we update the MSRV to 1.83.
+    struct PageTablePtr;
+    impl Deref for PageTablePtr {
+        type Target = PageTable;
+
+        fn deref(&self) -> &Self::Target {
+            unsafe { &*addr_of!(pgtable) }
+        }
+    }
+    impl DerefMut for PageTablePtr {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            unsafe { &mut *addr_of_mut!(pgtable) }
+        }
+    }
+
+    static PG_TABLE: SpinLock<PageTablePtr> = SpinLock::new(PageTablePtr);
+    PG_TABLE.lock()
+}
+
 /// Map and validate the specified virtual memory region at the given physical
 /// address.
 fn map_and_validate(
@@ -163,7 +183,7 @@ fn map_and_validate(
         | PTEntryFlags::ACCESSED
         | PTEntryFlags::DIRTY;
 
-    let mut pgtbl = this_cpu().get_pgtable();
+    let mut pgtbl = pgtable();
     pgtbl.map_region(vregion, paddr, flags)?;
 
     if config.page_state_change_required() {

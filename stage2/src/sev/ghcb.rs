@@ -7,12 +7,12 @@
 use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::msr::{write_msr, SEV_GHCB};
-use crate::cpu::percpu::this_cpu;
 use crate::error::SvsmError;
 use crate::mm::validate::{
     valid_bitmap_clear_valid_4k, valid_bitmap_set_valid_4k, valid_bitmap_valid_addr,
 };
 use crate::mm::virt_to_phys;
+use crate::pgtable;
 use crate::platform::PageStateChangeOp;
 use crate::sev::sev_snp_enabled;
 use crate::sev::utils::raw_vmgexit;
@@ -149,7 +149,7 @@ impl GhcbPage {
         }
 
         // Map page unencrypted
-        this_cpu().get_pgtable().set_shared_4k(vaddr)?;
+        pgtable().set_shared_4k(vaddr)?;
         flush_tlb_global_sync();
 
         // SAFETY: all zeros is a valid representation for the GHCB.
@@ -163,8 +163,7 @@ impl Drop for GhcbPage {
         let paddr = virt_to_phys(vaddr);
 
         // Re-encrypt page
-        this_cpu()
-            .get_pgtable()
+        pgtable()
             .set_encrypted_4k(vaddr)
             .expect("Could not re-encrypt page");
 
