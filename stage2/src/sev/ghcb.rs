@@ -8,6 +8,7 @@ use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::msr::{write_msr, SEV_GHCB};
 use crate::error::SvsmError;
+use crate::mm::alloc::allocate_page_zeroed;
 use crate::mm::validate::{
     valid_bitmap_clear_valid_4k, valid_bitmap_set_valid_4k, valid_bitmap_valid_addr,
 };
@@ -18,7 +19,6 @@ use crate::sev::utils::raw_vmgexit;
 use crate::types::{Bytes, PageSize, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 
-use crate::mm::PageBox;
 use core::mem::{self, offset_of};
 use core::ops::Deref;
 use core::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering};
@@ -126,12 +126,11 @@ impl TryFrom<Bytes> for GHCBIOSize {
 }
 
 #[derive(Debug)]
-pub struct GhcbPage(PageBox<GHCB>);
+pub struct GhcbPage(&'static GHCB);
 
 impl GhcbPage {
     pub fn new() -> Result<Self, SvsmError> {
-        let page = PageBox::<GHCB>::try_new_zeroed()?;
-        let vaddr = page.vaddr();
+        let vaddr = allocate_page_zeroed()?;
         let paddr = virt_to_phys(vaddr);
 
         // Make page invalid
@@ -150,13 +149,13 @@ impl GhcbPage {
         flush_tlb_global_sync();
 
         // SAFETY: all zeros is a valid representation for the GHCB.
-        Ok(Self(page))
+        unsafe { Ok(Self(&*vaddr.as_mut_ptr())) }
     }
 }
 
 impl Drop for GhcbPage {
     fn drop(&mut self) {
-        let vaddr = self.0.vaddr();
+        let vaddr = VirtAddr::from(core::ptr::from_ref(self.0));
         let paddr = virt_to_phys(vaddr);
 
         // Re-encrypt page
@@ -183,7 +182,7 @@ impl Drop for GhcbPage {
 impl Deref for GhcbPage {
     type Target = GHCB;
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        self.0
     }
 }
 
