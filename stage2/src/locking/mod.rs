@@ -4,8 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-pub mod rwlock;
 pub mod spinlock;
 
-pub use rwlock::{RWLock, ReadLockGuard, WriteLockGuard};
 pub use spinlock::SpinLock;
