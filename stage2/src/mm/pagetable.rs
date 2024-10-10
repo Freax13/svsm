@@ -9,7 +9,7 @@ use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::idt::common::PageFaultError;
 use crate::cpu::registers::RFlags;
 use crate::error::SvsmError;
-use crate::mm::PageBox;
+use crate::mm::alloc::allocate_page_zeroed;
 use crate::mm::{phys_to_virt, virt_to_phys};
 use crate::platform::SvsmPlatform;
 use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
@@ -224,9 +224,10 @@ impl PTPage {
     ///
     /// Returns [`SvsmError`] if the page cannot be allocated.
     fn alloc() -> Result<(&'static mut Self, PhysAddr), SvsmError> {
-        let page = PageBox::try_new(PTPage::default())?;
-        let paddr = virt_to_phys(page.vaddr());
-        Ok((PageBox::leak(page), paddr))
+        let vaddr = allocate_page_zeroed()?;
+        let page: &mut Self = unsafe { &mut *vaddr.as_mut_ptr() };
+        let paddr = virt_to_phys(vaddr);
+        Ok((page, paddr))
     }
 
     /// Converts a pagetable entry to a mutable reference to a [`PTPage`],

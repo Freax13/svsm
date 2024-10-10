@@ -4,12 +4,14 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr};
+use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::locking::SpinLock;
-use crate::mm::{virt_to_phys, PageBox};
+use crate::mm::alloc::allocate_zeroed;
+use crate::mm::virt_to_phys;
 use crate::types::PAGE_SIZE;
 use crate::utils::MemoryRegion;
+use core::alloc::Layout;
 use core::num::NonZeroUsize;
 
 static VALID_BITMAP: SpinLock<Option<ValidBitmap>> = SpinLock::new(None);
@@ -26,7 +28,9 @@ fn bitmap_elems(region: MemoryRegion<PhysAddr>) -> NonZeroUsize {
 
 pub fn init_valid_bitmap_alloc(region: MemoryRegion<PhysAddr>) -> Result<(), SvsmError> {
     let len = bitmap_elems(region);
-    let bitmap = PageBox::try_new_slice(0u64, len)?;
+    let layout = Layout::array::<u64>(len.get()).unwrap();
+    let ptr = allocate_zeroed(layout)?;
+    let bitmap = unsafe { core::slice::from_raw_parts_mut(ptr.as_mut_ptr(), len.get()) };
     *VALID_BITMAP.lock() = Some(ValidBitmap::new(region, bitmap));
 
     Ok(())
@@ -65,11 +69,11 @@ pub fn valid_bitmap_valid_addr(paddr: PhysAddr) -> bool {
 #[derive(Debug)]
 struct ValidBitmap {
     region: MemoryRegion<PhysAddr>,
-    bitmap: PageBox<[u64]>,
+    bitmap: &'static mut [u64],
 }
 
 impl ValidBitmap {
-    const fn new(region: MemoryRegion<PhysAddr>, bitmap: PageBox<[u64]>) -> Self {
+    fn new(region: MemoryRegion<PhysAddr>, bitmap: &'static mut [u64]) -> Self {
         Self { region, bitmap }
     }
 
@@ -78,7 +82,7 @@ impl ValidBitmap {
     }
 
     fn bitmap_addr(&self) -> PhysAddr {
-        virt_to_phys(self.bitmap.vaddr())
+        virt_to_phys(VirtAddr::from(self.bitmap.as_ptr()))
     }
 
     #[inline(always)]

@@ -6,9 +6,7 @@
 
 pub mod address_space;
 pub mod alloc;
-mod pagebox;
 pub mod pagetable;
 pub mod validate;
 
 pub use address_space::*;
-pub use pagebox::*;

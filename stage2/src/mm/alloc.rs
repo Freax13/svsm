@@ -58,11 +58,6 @@ pub fn allocate_page_zeroed() -> Result<VirtAddr, SvsmError> {
     allocate_zeroed(Layout::from_size_align(PAGE_SIZE, PAGE_SIZE).unwrap())
 }
 
-pub fn free_page(addr: VirtAddr) {
-    // For a bump allocator, freeing is a no-op.
-    let _ = addr;
-}
-
 /// Prints memory information.
 pub fn print_memory_info() {
     let guard = STATE.lock();
