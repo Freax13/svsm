@@ -7,7 +7,6 @@
 use crate::address::{Address, PhysAddr};
 use crate::cpu::irq_state::raw_irqs_disable;
 use crate::cpu::msr::{read_msr, write_msr, SEV_GHCB};
-use crate::cpu::{irqs_enabled, IrqGuard};
 use crate::error::SvsmError;
 use crate::utils::halt;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
@@ -73,10 +72,6 @@ static GHCB_HV_FEATURES: ImmutAfterInitCell<GHCBHvFeatures> = ImmutAfterInitCell
 
 /// Check that we support the hypervisor's advertised GHCB versions.
 pub fn verify_ghcb_version() {
-    // This function is normally only called early during initializtion before
-    // interrupts have been enabled, and before interrupt guards can safely be
-    // used.
-    assert!(!irqs_enabled());
     // Request SEV information.
     write_msr(SEV_GHCB, GHCBMsr::SEV_INFO_REQ);
     unsafe {
@@ -108,13 +103,11 @@ pub fn hypervisor_ghcb_features() -> GHCBHvFeatures {
 }
 
 pub fn init_hypervisor_ghcb_features() -> Result<(), GhcbMsrError> {
-    let guard = IrqGuard::new();
     write_msr(SEV_GHCB, GHCBMsr::SNP_HV_FEATURES_REQ);
     unsafe {
         raw_vmgexit();
     }
     let result = read_msr(SEV_GHCB);
-    drop(guard);
     if (result & 0xFFF) == GHCBMsr::SNP_HV_FEATURES_RESP {
         let features = GHCBHvFeatures::from_bits_truncate(result >> 12);
 
@@ -146,13 +139,11 @@ pub fn register_ghcb_gpa_msr(addr: PhysAddr) -> Result<(), GhcbMsrError> {
     let mut info = addr.bits() as u64;
 
     info |= GHCBMsr::SNP_REG_GHCB_GPA_REQ;
-    let guard = IrqGuard::new();
     write_msr(SEV_GHCB, info);
     unsafe {
         raw_vmgexit();
     }
     info = read_msr(SEV_GHCB);
-    drop(guard);
 
     if (info & 0xfff) != GHCBMsr::SNP_REG_GHCB_GPA_RESP {
         return Err(GhcbMsrError::InfoMismatch);
@@ -175,13 +166,11 @@ fn set_page_valid_status_msr(addr: PhysAddr, valid: bool) -> Result<(), GhcbMsrE
     }
 
     info |= GHCBMsr::SNP_STATE_CHANGE_REQ;
-    let guard = IrqGuard::new();
     write_msr(SEV_GHCB, info);
     unsafe {
         raw_vmgexit();
     }
     let response = read_msr(SEV_GHCB);
-    drop(guard);
 
     if (response & 0xfff) != GHCBMsr::SNP_STATE_CHANGE_RESP {
         return Err(GhcbMsrError::InfoMismatch);

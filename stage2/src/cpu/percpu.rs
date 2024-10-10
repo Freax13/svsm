@@ -4,10 +4,25 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+// TODO: FIx this
+
 extern crate alloc;
 
-use crate::address::{PhysAddr, VirtAddr};
-use crate::cpu::IrqState;
+use crate::address::VirtAddr;
 use crate::error::SvsmError;
 use crate::locking::{LockGuard, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
@@ -62,33 +77,14 @@ impl PerCpuAreas {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct GuestVmsaRef {
-    caa: Option<PhysAddr>,
-}
-
-impl GuestVmsaRef {
-    pub const fn new() -> Self {
-        GuestVmsaRef { caa: None }
-    }
-
-    pub fn caa_phys(&self) -> Option<PhysAddr> {
-        self.caa
-    }
-}
-
 #[derive(Debug)]
 pub struct PerCpuShared {
     apic_id: u32,
-    guest_vmsa: SpinLock<GuestVmsaRef>,
 }
 
 impl PerCpuShared {
     fn new(apic_id: u32) -> Self {
-        PerCpuShared {
-            apic_id,
-            guest_vmsa: SpinLock::new(GuestVmsaRef::new()),
-        }
+        PerCpuShared { apic_id }
     }
 }
 
@@ -102,12 +98,6 @@ const _: () = assert!(size_of::<PerCpu>() <= PAGE_SIZE);
 /// `shared` field, a reference to which will be stored in [`PERCPU_AREAS`].
 #[derive(Debug)]
 pub struct PerCpu {
-    /// Per-CPU storage that might be accessed from other CPUs.
-    shared: PerCpuShared,
-
-    /// PerCpu IRQ state tracking
-    irq_state: IrqState,
-
     pgtbl: RefCell<Option<&'static mut PageTable>>,
 
     /// GHCB page for this CPU.
@@ -119,9 +109,6 @@ impl PerCpu {
     fn new(apic_id: u32) -> Self {
         Self {
             pgtbl: RefCell::new(None),
-            irq_state: IrqState::new(),
-
-            shared: PerCpuShared::new(apic_id),
             ghcb: OnceCell::new(),
         }
     }
@@ -131,36 +118,7 @@ impl PerCpu {
     pub fn alloc(apic_id: u32) -> Result<&'static Self, SvsmError> {
         let page = PageBox::try_new(Self::new(apic_id))?;
         let percpu = PageBox::leak(page);
-        unsafe { PERCPU_AREAS.push(PerCpuInfo::new(apic_id, &percpu.shared)) };
         Ok(percpu)
-    }
-
-    pub fn shared(&self) -> &PerCpuShared {
-        &self.shared
-    }
-
-    /// Disables IRQs on the current CPU. Keeps track of the nesting level and
-    /// the original IRQ state.
-    ///
-    /// # Safety
-    ///
-    /// Caller needs to make sure to match every `disable()` call with an
-    /// `enable()` call.
-    #[inline(always)]
-    pub unsafe fn irqs_disable(&self) {
-        self.irq_state.disable();
-    }
-
-    /// Reduces IRQ-disable nesting level on the current CPU and restores the
-    /// original IRQ state when the level reaches 0.
-    ///
-    /// # Safety
-    ///
-    /// Caller needs to make sure to match every `disable()` call with an
-    /// `enable()` call.
-    #[inline(always)]
-    pub unsafe fn irqs_enable(&self) {
-        self.irq_state.enable();
     }
 
     /// Sets up the CPU-local GHCB page.
@@ -202,38 +160,10 @@ impl PerCpu {
         let flags = PTEntryFlags::data();
         self.get_pgtable().map_4k(SVSM_PERCPU_BASE, paddr, flags)
     }
-
-    pub fn guest_vmsa_ref(&self) -> LockGuard<'_, GuestVmsaRef> {
-        self.shared().guest_vmsa.lock()
-    }
 }
 
 pub fn this_cpu() -> &'static PerCpu {
     unsafe { &*SVSM_PERCPU_BASE.as_ptr::<PerCpu>() }
-}
-
-/// Disables IRQs on the current CPU. Keeps track of the nesting level and
-/// the original IRQ state.
-///
-/// # Safety
-///
-/// Caller needs to make sure to match every `irqs_disable()` call with an
-/// `irqs_enable()` call.
-#[inline(always)]
-pub unsafe fn irqs_disable() {
-    this_cpu().irqs_disable();
-}
-
-/// Reduces IRQ-disable nesting level on the current CPU and restores the
-/// original IRQ state when the level reaches 0.
-///
-/// # Safety
-///
-/// Caller needs to make sure to match every `irqs_disable()` call with an
-/// `irqs_enable()` call.
-#[inline(always)]
-pub unsafe fn irqs_enable() {
-    this_cpu().irqs_enable();
 }
 
 /// Gets the GHCB for this CPU.

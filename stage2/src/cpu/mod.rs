@@ -17,7 +17,5 @@ pub mod registers;
 pub mod tlb;
 
 pub use idt::common::X86ExceptionContext;
-pub use irq_state::{irqs_disabled, irqs_enabled, IrqGuard, IrqState};
-pub use percpu::{irqs_disable, irqs_enable};
-pub use registers::{X86GeneralRegs, X86InterruptFrame, X86SegmentRegs};
+pub use registers::X86GeneralRegs;
 pub use tlb::*;
