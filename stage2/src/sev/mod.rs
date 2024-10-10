@@ -14,4 +14,3 @@ pub use msr_protocol::init_hypervisor_ghcb_features;
 pub use status::sev_status_init;
 pub use status::sev_status_verify;
 pub use utils::{pvalidate, pvalidate_range, PvalidateOp, SevSnpError};
-pub use utils::{rmp_adjust, RMPFlags};
