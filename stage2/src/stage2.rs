@@ -33,7 +33,6 @@ use crate::console::install_console_logger;
 use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
 use crate::cpu::gdt::GDT;
 use crate::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
-use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::fw_cfg::FwCfg;
 use crate::igvm_params::IgvmParams;
@@ -42,8 +41,8 @@ use crate::mm::pagetable::{paging_init_early, PTEntryFlags, PageTable};
 use crate::mm::validate::{
     init_valid_bitmap_alloc, valid_bitmap_addr, valid_bitmap_set_valid_range,
 };
-use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange, SVSM_PERCPU_BASE};
-use crate::platform::{PageStateChangeOp, PageValidateOp, SvsmPlatform, SvsmPlatformCell};
+use crate::mm::{init_kernel_mapping_info, FixedAddressMappingRange};
+use crate::platform::{PageStateChangeOp, SvsmPlatform, SvsmPlatformCell};
 use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::{halt, is_aligned, MemoryRegion};
 use bootlib::kernel_launch::{KernelLaunchInfo, Stage2LaunchInfo};
@@ -53,10 +52,12 @@ use core::ops::{Deref, DerefMut};
 use core::panic::PanicInfo;
 use core::ptr::{addr_of, addr_of_mut};
 use core::slice;
+use cpu::percpu::shutdown_ghcb;
 use cpuarch::snp_cpuid::SnpCpuidTable;
 use elf::ElfError;
 use locking::spinlock::LockGuard;
 use locking::SpinLock;
+use platform::PageValidateOp;
 
 fn setup_stage2_allocator(heap_start: u64, heap_end: u64) {
     let vstart = VirtAddr::from(heap_start);
@@ -65,24 +66,6 @@ fn setup_stage2_allocator(heap_start: u64, heap_end: u64) {
     let nr_pages = (vend - vstart) / PAGE_SIZE;
 
     root_mem_init(pstart, vstart, nr_pages);
-}
-
-fn init_percpu(platform: &mut dyn SvsmPlatform) -> Result<(), SvsmError> {
-    let bsp_percpu = PerCpu::alloc()?;
-    bsp_percpu.map_self_stage2()?;
-    platform.setup_guest_host_comm(bsp_percpu, true);
-    Ok(())
-}
-
-/// Release all resources in the `PerCpu` instance associated with the current
-/// CPU.
-///
-/// # Safety
-///
-/// The caller must ensure that the `PerCpu` is never used again.
-unsafe fn shutdown_percpu() {
-    let ptr = SVSM_PERCPU_BASE.as_mut_ptr::<PerCpu>();
-    core::ptr::drop_in_place(ptr);
 }
 
 fn setup_env(
@@ -128,7 +111,7 @@ fn setup_env(
     // Configure the heap to exist from 64 KB to 640 KB.
     setup_stage2_allocator(0x10000, 0xA0000);
 
-    init_percpu(platform).expect("Failed to initialize per-cpu area");
+    platform.setup_guest_host_comm(true);
 
     // Init IDT again with handlers requiring GHCB (eg. #VC handler)
     early_idt_init();
@@ -483,7 +466,7 @@ pub extern "C" fn stage2_main(launch_info: &Stage2LaunchInfo) {
 
     // Shut down the GHCB
     unsafe {
-        shutdown_percpu();
+        shutdown_ghcb();
     }
 
     unsafe {

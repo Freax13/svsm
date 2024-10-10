@@ -4,88 +4,55 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::VirtAddr;
 use crate::error::SvsmError;
-use crate::mm::pagetable::PTEntryFlags;
-use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE};
-use crate::pgtable;
 use crate::sev::ghcb::{GhcbPage, GHCB};
-use crate::types::PAGE_SIZE;
-use core::cell::OnceCell;
-use core::mem::size_of;
-use core::ptr;
+use core::cell::{Ref, RefCell};
 
-const _: () = assert!(size_of::<PerCpu>() <= PAGE_SIZE);
+static mut GHCB: RefCell<Option<GhcbPage>> = RefCell::new(None);
 
-/// CPU-local data.
+/// Sets up the CPU-local GHCB page.
+pub fn setup_ghcb() -> Result<(), SvsmError> {
+    let page = GhcbPage::new()?;
+    let mut guard = unsafe {
+        // FIXME: This is not safe.
+        GHCB.borrow_mut()
+    };
+    assert!(guard.is_none(), "Attempted to reinitialize the GHCB");
+    *guard = Some(page);
+    Ok(())
+}
+
+/// Registers an already set up GHCB page for this CPU.
 ///
-/// This type is not [`Sync`], as its contents will only be accessed from the
-/// local CPU, much like thread-local data in an std environment. The only
-/// part of the struct that may be accessed from a different CPU is the
-/// `shared` field, a reference to which will be stored in [`PERCPU_AREAS`].
-#[derive(Debug)]
-pub struct PerCpu {
-    /// GHCB page for this CPU.
-    ghcb: OnceCell<GhcbPage>,
-}
-
-impl PerCpu {
-    /// Creates a new default [`PerCpu`] struct.
-    fn new() -> Self {
-        Self {
-            ghcb: OnceCell::new(),
-        }
-    }
-
-    /// Creates a new default [`PerCpu`] struct, allocates it via the page
-    /// allocator and adds it to the global per-cpu area list.
-    pub fn alloc() -> Result<&'static Self, SvsmError> {
-        let page = PageBox::try_new(Self::new())?;
-        let percpu = PageBox::leak(page);
-        Ok(percpu)
-    }
-
-    /// Sets up the CPU-local GHCB page.
-    pub fn setup_ghcb(&self) -> Result<(), SvsmError> {
-        let page = GhcbPage::new()?;
-        self.ghcb
-            .set(page)
-            .expect("Attempted to reinitialize the GHCB");
-        Ok(())
-    }
-
-    fn ghcb(&self) -> Option<&GhcbPage> {
-        self.ghcb.get()
-    }
-
-    /// Registers an already set up GHCB page for this CPU.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the GHCB for this CPU has not been set up via
-    /// [`PerCpu::setup_ghcb()`].
-    pub fn register_ghcb(&self) -> Result<(), SvsmError> {
-        self.ghcb().unwrap().register()
-    }
-
-    pub fn map_self_stage2(&self) -> Result<(), SvsmError> {
-        let vaddr = VirtAddr::from(ptr::from_ref(self));
-        let paddr = virt_to_phys(vaddr);
-        let flags = PTEntryFlags::data();
-        pgtable().map_4k(SVSM_PERCPU_BASE, paddr, flags)
-    }
-}
-
-pub fn this_cpu() -> &'static PerCpu {
-    unsafe { &*SVSM_PERCPU_BASE.as_ptr::<PerCpu>() }
+/// # Panics
+///
+/// Panics if the GHCB for this CPU has not been set up via [`setup_ghcb()`].
+pub fn register_ghcb() -> Result<(), SvsmError> {
+    current_ghcb().register()
 }
 
 /// Gets the GHCB for this CPU.
 ///
 /// # Panics
 ///
-/// Panics if the GHCB for this CPU has not been set up via
-/// [`PerCpu::setup_ghcb()`].
-pub fn current_ghcb() -> &'static GHCB {
-    this_cpu().ghcb().unwrap()
+/// Panics if the GHCB for this CPU has not been set up via [`setup_ghcb()`].
+pub fn current_ghcb() -> Ref<'static, GHCB> {
+    let guard = unsafe {
+        // FIXME: This is not safe.
+        GHCB.borrow()
+    };
+    Ref::map(guard, |a| &**a.as_ref().unwrap())
+}
+
+/// Release the GHCB.
+///
+/// # Safety
+///
+/// The caller must ensure that the GHCB is never used again.
+pub unsafe fn shutdown_ghcb() {
+    let mut guard = unsafe {
+        // FIXME: This is not safe.
+        GHCB.borrow_mut()
+    };
+    guard.take();
 }

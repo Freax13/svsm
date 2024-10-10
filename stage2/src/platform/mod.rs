@@ -5,7 +5,6 @@
 // Author: Jon Lange <jlange@microsoft.com>
 
 use crate::address::{PhysAddr, VirtAddr};
-use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::IOPort;
 use crate::platform::native::NativePlatform;
@@ -59,7 +58,7 @@ pub trait SvsmPlatform {
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks;
 
     /// Establishes state required for guest/host communication.
-    fn setup_guest_host_comm(&mut self, cpu: &PerCpu, is_bsp: bool);
+    fn setup_guest_host_comm(&mut self, is_bsp: bool);
 
     /// Obtains a reference to an I/O port implemetation appropriate to the
     /// platform.

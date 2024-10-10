@@ -7,7 +7,7 @@
 use crate::address::{PhysAddr, VirtAddr};
 use crate::console::init_console;
 use crate::cpu::cpuid::cpuid_table;
-use crate::cpu::percpu::{current_ghcb, PerCpu};
+use crate::cpu::percpu::{current_ghcb, register_ghcb, setup_ghcb};
 use crate::error::SvsmError;
 use crate::io::IOPort;
 use crate::platform::{PageEncryptionMasks, PageStateChangeOp, PageValidateOp, SvsmPlatform};
@@ -95,19 +95,19 @@ impl SvsmPlatform for SnpPlatform {
         }
     }
 
-    fn setup_guest_host_comm(&mut self, cpu: &PerCpu, is_bsp: bool) {
+    fn setup_guest_host_comm(&mut self, is_bsp: bool) {
         if is_bsp {
             verify_ghcb_version();
         }
 
-        cpu.setup_ghcb().unwrap_or_else(|_| {
+        setup_ghcb().unwrap_or_else(|_| {
             if is_bsp {
                 panic!("Failed to setup BSP GHCB");
             } else {
                 panic!("Failed to setup AP GHCB");
             }
         });
-        cpu.register_ghcb().expect("Failed to register GHCB");
+        register_ghcb().expect("Failed to register GHCB");
     }
 
     fn get_io_port(&self) -> &'static dyn IOPort {
