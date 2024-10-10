@@ -5,7 +5,6 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use crate::address::VirtAddr;
-use crate::cpu::IrqState;
 use crate::error::SvsmError;
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE};
@@ -25,9 +24,6 @@ const _: () = assert!(size_of::<PerCpu>() <= PAGE_SIZE);
 /// `shared` field, a reference to which will be stored in [`PERCPU_AREAS`].
 #[derive(Debug)]
 pub struct PerCpu {
-    /// PerCpu IRQ state tracking
-    irq_state: IrqState,
-
     pgtbl: RefCell<Option<&'static mut PageTable>>,
 
     /// GHCB page for this CPU.
@@ -39,8 +35,6 @@ impl PerCpu {
     fn new() -> Self {
         Self {
             pgtbl: RefCell::new(None),
-            irq_state: IrqState::new(),
-
             ghcb: OnceCell::new(),
         }
     }
@@ -51,30 +45,6 @@ impl PerCpu {
         let page = PageBox::try_new(Self::new())?;
         let percpu = PageBox::leak(page);
         Ok(percpu)
-    }
-
-    /// Disables IRQs on the current CPU. Keeps track of the nesting level and
-    /// the original IRQ state.
-    ///
-    /// # Safety
-    ///
-    /// Caller needs to make sure to match every `disable()` call with an
-    /// `enable()` call.
-    #[inline(always)]
-    pub unsafe fn irqs_disable(&self) {
-        self.irq_state.disable();
-    }
-
-    /// Reduces IRQ-disable nesting level on the current CPU and restores the
-    /// original IRQ state when the level reaches 0.
-    ///
-    /// # Safety
-    ///
-    /// Caller needs to make sure to match every `disable()` call with an
-    /// `enable()` call.
-    #[inline(always)]
-    pub unsafe fn irqs_enable(&self) {
-        self.irq_state.enable();
     }
 
     /// Sets up the CPU-local GHCB page.
@@ -120,30 +90,6 @@ impl PerCpu {
 
 pub fn this_cpu() -> &'static PerCpu {
     unsafe { &*SVSM_PERCPU_BASE.as_ptr::<PerCpu>() }
-}
-
-/// Disables IRQs on the current CPU. Keeps track of the nesting level and
-/// the original IRQ state.
-///
-/// # Safety
-///
-/// Caller needs to make sure to match every `irqs_disable()` call with an
-/// `irqs_enable()` call.
-#[inline(always)]
-pub unsafe fn irqs_disable() {
-    this_cpu().irqs_disable();
-}
-
-/// Reduces IRQ-disable nesting level on the current CPU and restores the
-/// original IRQ state when the level reaches 0.
-///
-/// # Safety
-///
-/// Caller needs to make sure to match every `irqs_disable()` call with an
-/// `irqs_enable()` call.
-#[inline(always)]
-pub unsafe fn irqs_enable() {
-    this_cpu().irqs_enable();
 }
 
 /// Gets the GHCB for this CPU.
