@@ -4,26 +4,22 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use super::common::*;
 use core::cell::UnsafeCell;
-use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicU64, Ordering};
 
 /// A guard that provides read access to the data protected by [`RWLock`]
 #[derive(Debug)]
 #[must_use = "if unused the RWLock will immediately unlock"]
-pub struct RawReadLockGuard<'a, T, I> {
+pub struct ReadLockGuard<'a, T> {
     /// Reference to the associated `AtomicU64` in the [`RWLock`]
     rwlock: &'a AtomicU64,
     /// Reference to the protected data
     data: &'a T,
-    /// IRQ state before and after critical section
-    _irq_state: I,
 }
 
 /// Implements the behavior of the [`ReadLockGuard`] when it is dropped
-impl<T, I> Drop for RawReadLockGuard<'_, T, I> {
+impl<T> Drop for ReadLockGuard<'_, T> {
     /// Release the read lock
     fn drop(&mut self) {
         self.rwlock.fetch_sub(1, Ordering::Release);
@@ -32,7 +28,7 @@ impl<T, I> Drop for RawReadLockGuard<'_, T, I> {
 
 /// Implements the behavior of dereferencing the [`ReadLockGuard`] to
 /// access the protected data.
-impl<T, I> Deref for RawReadLockGuard<'_, T, I> {
+impl<T> Deref for ReadLockGuard<'_, T> {
     type Target = T;
     /// Allow reading the protected data through deref
     fn deref(&self) -> &T {
@@ -40,22 +36,18 @@ impl<T, I> Deref for RawReadLockGuard<'_, T, I> {
     }
 }
 
-pub type ReadLockGuard<'a, T> = RawReadLockGuard<'a, T, IrqUnsafeLocking>;
-
 /// A guard that provides exclusive write access to the data protected by [`RWLock`]
 #[derive(Debug)]
 #[must_use = "if unused the RWLock will immediately unlock"]
-pub struct RawWriteLockGuard<'a, T, I> {
+pub struct WriteLockGuard<'a, T> {
     /// Reference to the associated `AtomicU64` in the [`RWLock`]
     rwlock: &'a AtomicU64,
     /// Reference to the protected data (mutable)
     data: &'a mut T,
-    /// IRQ state before and after critical section
-    _irq_state: I,
 }
 
 /// Implements the behavior of the [`WriteLockGuard`] when it is dropped
-impl<T, I> Drop for RawWriteLockGuard<'_, T, I> {
+impl<T> Drop for WriteLockGuard<'_, T> {
     fn drop(&mut self) {
         // There are no readers - safe to just set lock to 0
         self.rwlock.store(0, Ordering::Release);
@@ -64,7 +56,7 @@ impl<T, I> Drop for RawWriteLockGuard<'_, T, I> {
 
 /// Implements the behavior of dereferencing the [`WriteLockGuard`] to
 /// access the protected data.
-impl<T, I> Deref for RawWriteLockGuard<'_, T, I> {
+impl<T> Deref for WriteLockGuard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
         self.data
@@ -73,30 +65,26 @@ impl<T, I> Deref for RawWriteLockGuard<'_, T, I> {
 
 /// Implements the behavior of dereferencing the [`WriteLockGuard`] to
 /// access the protected data in a mutable way.
-impl<T, I> DerefMut for RawWriteLockGuard<'_, T, I> {
+impl<T> DerefMut for WriteLockGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
         self.data
     }
 }
 
-pub type WriteLockGuard<'a, T> = RawWriteLockGuard<'a, T, IrqUnsafeLocking>;
-
 /// A simple Read-Write Lock (RWLock) that allows multiple readers or
 /// one exclusive writer.
 #[derive(Debug)]
-pub struct RawRWLock<T, I> {
+pub struct RWLock<T> {
     /// An atomic 64-bit integer used for synchronization
     rwlock: AtomicU64,
     /// An UnsafeCell for interior mutability
     data: UnsafeCell<T>,
-    /// Silence unused type warning
-    phantom: PhantomData<fn(I)>,
 }
 
 /// Implements the trait `Sync` for the [`RWLock`], allowing safe
 /// concurrent access across threads.
-unsafe impl<T: Send, I> Send for RawRWLock<T, I> {}
-unsafe impl<T: Send + Sync, I> Sync for RawRWLock<T, I> {}
+unsafe impl<T: Send> Send for RWLock<T> {}
+unsafe impl<T: Send + Sync> Sync for RWLock<T> {}
 
 /// Splits a 64-bit value into two parts: readers (low 32 bits) and
 /// writers (high 32 bits).
@@ -136,7 +124,7 @@ fn compose_val(readers: u64, writers: u64) -> u64 {
 /// A reader-writer lock that allows multiple readers or a single writer
 /// to access the protected data. [`RWLock`] provides exclusive access for
 /// writers and shared access for readers, for efficient synchronization.
-impl<T, I: IrqLocking> RawRWLock<T, I> {
+impl<T> RWLock<T> {
     /// Creates a new [`RWLock`] instance with the provided initial data.
     ///
     /// # Parameters
@@ -164,7 +152,6 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
         Self {
             rwlock: AtomicU64::new(0),
             data: UnsafeCell::new(data),
-            phantom: PhantomData,
         }
     }
 
@@ -213,8 +200,7 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
     /// # Returns
     ///
     /// A [`ReadLockGuard`] that provides read access to the protected data.
-    pub fn lock_read(&self) -> RawReadLockGuard<'_, T, I> {
-        let irq_state = I::irqs_disable();
+    pub fn lock_read(&self) -> ReadLockGuard<'_, T> {
         loop {
             let val = self.wait_for_writers();
             let (readers, _) = split_val(val);
@@ -230,10 +216,9 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
             core::hint::spin_loop();
         }
 
-        RawReadLockGuard {
+        ReadLockGuard {
             rwlock: &self.rwlock,
             data: unsafe { &*self.data.get() },
-            _irq_state: irq_state,
         }
     }
 
@@ -243,9 +228,7 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
     /// # Returns
     ///
     /// A [`WriteLockGuard`] that provides write access to the protected data.
-    pub fn lock_write(&self) -> RawWriteLockGuard<'_, T, I> {
-        let irq_state = I::irqs_disable();
-
+    pub fn lock_write(&self) -> WriteLockGuard<'_, T> {
         // Waiting for current writer to finish
         loop {
             let val = self.wait_for_writers();
@@ -266,12 +249,9 @@ impl<T, I: IrqLocking> RawRWLock<T, I> {
         let val: u64 = self.wait_for_readers();
         assert!(val == compose_val(0, 1));
 
-        RawWriteLockGuard {
+        WriteLockGuard {
             rwlock: &self.rwlock,
             data: unsafe { &mut *self.data.get() },
-            _irq_state: irq_state,
         }
     }
 }
-
-pub type RWLock<T> = RawRWLock<T, IrqUnsafeLocking>;

@@ -4,9 +4,7 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use super::common::*;
 use core::cell::UnsafeCell;
-use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -29,15 +27,13 @@ use core::sync::atomic::{AtomicU64, Ordering};
 /// ```
 #[derive(Debug)]
 #[must_use = "if unused the SpinLock will immediately unlock"]
-pub struct RawLockGuard<'a, T, I = IrqUnsafeLocking> {
+pub struct LockGuard<'a, T> {
     holder: &'a AtomicU64,
     data: &'a mut T,
-    #[allow(dead_code)]
-    irq_state: I,
 }
 
 /// Implements the behavior of the [`LockGuard`] when it is dropped
-impl<T, I> Drop for RawLockGuard<'_, T, I> {
+impl<T> Drop for LockGuard<'_, T> {
     /// Automatically releases the lock when the guard is dropped
     fn drop(&mut self) {
         self.holder.fetch_add(1, Ordering::Release);
@@ -46,7 +42,7 @@ impl<T, I> Drop for RawLockGuard<'_, T, I> {
 
 /// Implements the behavior of dereferencing the [`LockGuard`] to
 /// access the protected data.
-impl<T, I> Deref for RawLockGuard<'_, T, I> {
+impl<T> Deref for LockGuard<'_, T> {
     type Target = T;
     /// Provides read-only access to the protected data
     fn deref(&self) -> &T {
@@ -56,7 +52,7 @@ impl<T, I> Deref for RawLockGuard<'_, T, I> {
 
 /// Implements the behavior of dereferencing the [`LockGuard`] to
 /// access the protected data in a mutable way.
-impl<T, I> DerefMut for RawLockGuard<'_, T, I> {
+impl<T> DerefMut for LockGuard<'_, T> {
     /// Provides mutable access to the protected data
     fn deref_mut(&mut self) -> &mut T {
         self.data
@@ -92,7 +88,7 @@ impl<T, I> DerefMut for RawLockGuard<'_, T, I> {
 /// };
 /// ```
 #[derive(Debug, Default)]
-pub struct RawSpinLock<T, I = IrqUnsafeLocking> {
+pub struct SpinLock<T> {
     /// This atomic counter is incremented each time a thread attempts to
     /// acquire the lock. It helps to determine the order in which threads
     /// acquire the lock.
@@ -104,14 +100,12 @@ pub struct RawSpinLock<T, I = IrqUnsafeLocking> {
     /// protected data. That is, it allows the data to be accessed/modified
     /// while enforcing the locking mechanism.
     data: UnsafeCell<T>,
-    /// Use generic type I in the struct without consuming space.
-    phantom: PhantomData<fn(I)>,
 }
 
-unsafe impl<T: Send, I> Send for RawSpinLock<T, I> {}
-unsafe impl<T: Send, I> Sync for RawSpinLock<T, I> {}
+unsafe impl<T: Send> Send for SpinLock<T> {}
+unsafe impl<T: Send> Sync for SpinLock<T> {}
 
-impl<T, I: IrqLocking> RawSpinLock<T, I> {
+impl<T> SpinLock<T> {
     /// Creates a new SpinLock instance with the specified initial data.
     ///
     /// # Examples
@@ -127,7 +121,6 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
             current: AtomicU64::new(0),
             holder: AtomicU64::new(0),
             data: UnsafeCell::new(data),
-            phantom: PhantomData,
         }
     }
 
@@ -146,9 +139,7 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
     ///     *guard += 1;
     /// }; // Lock is automatically released when `guard` goes out of scope.
     /// ```
-    pub fn lock(&self) -> RawLockGuard<'_, T, I> {
-        let irq_state = I::irqs_disable();
-
+    pub fn lock(&self) -> LockGuard<'_, T> {
         let ticket = self.current.fetch_add(1, Ordering::Relaxed);
         loop {
             let h = self.holder.load(Ordering::Acquire);
@@ -157,10 +148,9 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
             }
             core::hint::spin_loop();
         }
-        RawLockGuard {
+        LockGuard {
             holder: &self.holder,
             data: unsafe { &mut *self.data.get() },
-            irq_state,
         }
     }
 
@@ -168,9 +158,7 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
     /// lock is not available, it returns `None`. If the lock is
     /// successfully acquired, it returns a [`LockGuard`] that automatically
     /// releases the lock when it goes out of scope.
-    pub fn try_lock(&self) -> Option<RawLockGuard<'_, T, I>> {
-        let irq_state = I::irqs_disable();
-
+    pub fn try_lock(&self) -> Option<LockGuard<'_, T>> {
         let current = self.current.load(Ordering::Relaxed);
         let holder = self.holder.load(Ordering::Acquire);
 
@@ -182,10 +170,9 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
                 Ordering::Relaxed,
             );
             if result.is_ok() {
-                return Some(RawLockGuard {
+                return Some(LockGuard {
                     holder: &self.holder,
                     data: unsafe { &mut *self.data.get() },
-                    irq_state,
                 });
             }
         }
@@ -193,5 +180,3 @@ impl<T, I: IrqLocking> RawSpinLock<T, I> {
         None
     }
 }
-
-pub type SpinLock<T> = RawSpinLock<T, IrqUnsafeLocking>;

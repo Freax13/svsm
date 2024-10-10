@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-pub mod common;
 pub mod rwlock;
 pub mod spinlock;
 
