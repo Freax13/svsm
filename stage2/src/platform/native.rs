@@ -7,7 +7,6 @@
 use crate::address::{PhysAddr, VirtAddr};
 use crate::console::init_svsm_console;
 use crate::cpu::cpuid::CpuidResult;
-use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::{IOPort, DEFAULT_IO_DRIVER};
 use crate::platform::{PageEncryptionMasks, PageStateChangeOp, PageValidateOp, SvsmPlatform};
@@ -54,7 +53,7 @@ impl SvsmPlatform for NativePlatform {
         }
     }
 
-    fn setup_guest_host_comm(&mut self, _cpu: &PerCpu, _is_bsp: bool) {}
+    fn setup_guest_host_comm(&mut self, _is_bsp: bool) {}
 
     fn get_io_port(&self) -> &'static dyn IOPort {
         &DEFAULT_IO_DRIVER
