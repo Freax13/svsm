@@ -9,9 +9,9 @@ fn main() {
     println!("cargo::rustc-check-cfg=cfg(fuzzing)");
     println!("cargo::rustc-check-cfg=cfg(test_in_svsm)");
 
-    println!("cargo:rustc-link-arg-bin=stage2=-nostdlib");
-    println!("cargo:rustc-link-arg-bin=stage2=--build-id=none");
-    println!("cargo:rustc-link-arg-bin=stage2=-Tstage2/src/stage2.lds");
-    println!("cargo:rustc-link-arg-bin=stage2=-no-pie");
+    println!("cargo:rustc-link-arg=-nostdlib");
+    println!("cargo:rustc-link-arg=--build-id=none");
+    println!("cargo:rustc-link-arg=-Tstage2/src/stage2.lds");
+    println!("cargo:rustc-link-arg=-no-pie");
     println!("cargo:rerun-if-changed=stage2/src/stage2.lds");
 }
