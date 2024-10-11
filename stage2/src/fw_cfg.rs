@@ -34,6 +34,7 @@ pub struct FwCfg<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub enum FwCfgError {
     // Could not find the appropriate file selector.
     FileNotFound,

@@ -42,6 +42,7 @@ impl CpuidLeaf {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub struct CpuidResult {
     pub eax: u32,
     pub ebx: u32,

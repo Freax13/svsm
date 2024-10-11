@@ -22,7 +22,7 @@
 
 use crate::address::VirtAddr;
 use crate::error::SvsmError;
-use crate::sev::ghcb::{GhcbPage, GHCB};
+use crate::sev::ghcb::{Ghcb, GhcbPage};
 use core::cell::{Ref, RefCell};
 
 static mut GHCB: RefCell<Option<GhcbPage>> = RefCell::new(None);
@@ -53,7 +53,7 @@ pub fn register_ghcb() -> Result<(), SvsmError> {
 /// # Panics
 ///
 /// Panics if the GHCB for this CPU has not been set up via [`setup_ghcb()`].
-pub fn current_ghcb() -> Ref<'static, GHCB> {
+pub fn current_ghcb() -> Ref<'static, Ghcb> {
     let guard = unsafe {
         // FIXME: This is not safe.
         GHCB.borrow()

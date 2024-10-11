@@ -24,6 +24,7 @@ pub trait IOPort: Sync + Debug {
         unsafe { asm!("outw %ax, %dx", in("ax") value, in("dx") port, options(att_syntax)) }
     }
 
+    #[allow(dead_code)] // TODO: Should we remove this?
     fn inw(&self, port: u16) -> u16 {
         unsafe {
             let ret: u16;
@@ -32,10 +33,12 @@ pub trait IOPort: Sync + Debug {
         }
     }
 
+    #[allow(dead_code)] // TODO: Should we remove this?
     fn outl(&self, port: u16, value: u32) {
         unsafe { asm!("outl %eax, %dx", in("eax") value, in("dx") port, options(att_syntax)) }
     }
 
+    #[allow(dead_code)] // TODO: Should we remove this?
     fn inl(&self, port: u16) -> u32 {
         unsafe {
             let ret: u32;

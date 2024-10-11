@@ -188,7 +188,7 @@ impl VirtAddr {
     }
 
     /// Returns the index into page-table pages of given levels.
-    pub const fn to_pgtbl_idx<const L: usize>(&self) -> usize {
+    pub const fn to_pgtbl_idx<const L: usize>(self) -> usize {
         (self.0 >> (12 + L * 9)) & 0x1ffusize
     }
 

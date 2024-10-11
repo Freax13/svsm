@@ -23,11 +23,13 @@ pub const _MSR: u16 = 6; // Modem Status
 pub const DLL: u16 = 0; // Divisor Latch Low
 pub const DLH: u16 = 1; // Divisor Latch High
 
+#[allow(dead_code)] // TODO: Should we remove this?
 pub const RCVRDY: u8 = 0x01;
 pub const XMTRDY: u8 = 0x20;
 
 pub trait Terminal: Sync + Debug {
     fn put_byte(&self, _ch: u8) {}
+    #[allow(dead_code)] // TODO: Should we remove this?
     fn get_byte(&self) -> u8 {
         0
     }

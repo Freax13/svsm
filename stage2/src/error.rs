@@ -39,6 +39,7 @@ pub enum ApicError {
 
 /// A generic error during SVSM operation.
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub enum SvsmError {
     /// Errors related to platform initialization.
     PlatformInit,

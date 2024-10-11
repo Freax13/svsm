@@ -106,13 +106,13 @@ struct IdtDesc {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct IDT {
+pub struct Idt {
     entries: [IdtEntry; IDT_ENTRIES],
 }
 
-impl IDT {
+impl Idt {
     pub const fn new() -> Self {
-        IDT {
+        Idt {
             entries: [IdtEntry::no_handler(); IDT_ENTRIES],
         }
     }
@@ -135,13 +135,13 @@ impl IDT {
     }
 }
 
-impl Default for IDT {
+impl Default for Idt {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LockGuard<'static, IDT> {
+impl LockGuard<'static, Idt> {
     /// Load an IDT. Its lifetime must be static so that its entries are
     /// always available to the CPU.
     pub fn load(&self) {
@@ -156,9 +156,9 @@ impl LockGuard<'static, IDT> {
     }
 }
 
-static IDT: SpinLock<IDT> = SpinLock::new(IDT::new());
+static IDT: SpinLock<Idt> = SpinLock::new(Idt::new());
 
-pub fn idt_mut() -> LockGuard<'static, IDT> {
+pub fn idt_mut() -> LockGuard<'static, Idt> {
     IDT.lock()
 }
 

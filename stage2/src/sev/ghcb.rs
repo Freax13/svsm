@@ -68,6 +68,7 @@ macro_rules! ghcb_setter {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub enum GhcbError {
     // Attempted to write at an invalid offset in the GHCB
     InvalidOffset,
@@ -112,7 +113,7 @@ impl TryFrom<Bytes> for GHCBIOSize {
 }
 
 #[derive(Debug)]
-pub struct GhcbPage(&'static GHCB);
+pub struct GhcbPage(&'static Ghcb);
 
 impl GhcbPage {
     pub fn new() -> Result<Self, SvsmError> {
@@ -166,7 +167,7 @@ impl Drop for GhcbPage {
 }
 
 impl Deref for GhcbPage {
-    type Target = GHCB;
+    type Target = Ghcb;
     fn deref(&self) -> &Self::Target {
         self.0
     }
@@ -174,7 +175,7 @@ impl Deref for GhcbPage {
 
 #[repr(C)]
 #[derive(Debug, FromZeros)]
-pub struct GHCB {
+pub struct Ghcb {
     reserved_1: [AtomicU8; 0xcb],
     cpl: AtomicU8,
     reserved_2: [AtomicU8; 0x74],
@@ -204,7 +205,7 @@ pub struct GHCB {
     usage: AtomicU32,
 }
 
-impl GHCB {
+impl Ghcb {
     ghcb_getter!(get_cpl_valid, cpl, u8);
     ghcb_setter!(set_cpl_valid, cpl, u8);
 
@@ -251,7 +252,7 @@ impl GHCB {
     ghcb_setter!(set_usage_valid, usage, u32);
 
     pub fn register(&self) -> Result<(), SvsmError> {
-        let vaddr = VirtAddr::from(self as *const GHCB);
+        let vaddr = VirtAddr::from(self as *const Ghcb);
         let paddr = virt_to_phys(vaddr);
 
         // Register GHCB GPA
@@ -299,7 +300,7 @@ impl GHCB {
         self.set_exit_info_1_valid(exit_info_1);
         self.set_exit_info_2_valid(exit_info_2);
 
-        let ghcb_address = VirtAddr::from(self as *const GHCB);
+        let ghcb_address = VirtAddr::from(self as *const Ghcb);
         let ghcb_pa = u64::from(virt_to_phys(ghcb_address));
         // Disable interrupts between writing the MSR and making the GHCB call
         // to prevent reentrant use of the GHCB MSR.
