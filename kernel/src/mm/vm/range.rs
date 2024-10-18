@@ -4,13 +4,13 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::cpu::{flush_tlb_global_percpu, flush_tlb_global_sync};
 use crate::error::SvsmError;
 use crate::locking::RWLock;
 use crate::mm::pagetable::{PTEntryFlags, PageTable, PageTablePart};
 use crate::types::{PageSize, PAGE_SHIFT, PAGE_SIZE};
 use crate::utils::{align_down, align_up};
+use cpuarch::address::{Address, VirtAddr};
 
 use core::cmp::max;
 

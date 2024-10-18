@@ -5,12 +5,12 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::VirtualMapping;
-use crate::address::{PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::mm::address_space::STACK_SIZE;
 use crate::mm::pagetable::PTEntryFlags;
 use crate::types::{PAGE_SHIFT, PAGE_SIZE};
 use crate::utils::{page_align_up, MemoryRegion};
+use cpuarch::address::{PhysAddr, VirtAddr};
 
 use super::rawalloc::RawAllocMapping;
 use super::Mapping;

@@ -5,8 +5,8 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::gdt::GDTEntry;
-use crate::address::VirtAddr;
 use core::num::NonZeroU8;
+use cpuarch::address::VirtAddr;
 
 // IST offsets
 pub const IST_DF: NonZeroU8 = unsafe { NonZeroU8::new_unchecked(1) };

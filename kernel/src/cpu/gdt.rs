@@ -5,11 +5,11 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::tss::X86Tss;
-use crate::address::VirtAddr;
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
 use crate::types::{SVSM_CS, SVSM_DS, SVSM_TSS};
 use core::arch::asm;
 use core::mem;
+use cpuarch::address::VirtAddr;
 
 #[repr(C, packed(2))]
 #[derive(Clone, Copy, Debug, Default)]

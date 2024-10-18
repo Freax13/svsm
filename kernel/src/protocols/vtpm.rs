@@ -13,12 +13,12 @@ use core::{mem::size_of, slice::from_raw_parts_mut};
 use alloc::vec::Vec;
 
 use crate::{
-    address::{Address, PhysAddr},
     mm::{valid_phys_address, GuestPtr, PerCPUPageMappingGuard},
     protocols::{errors::SvsmReqError, RequestParams},
     types::PAGE_SIZE,
     vtpm::{vtpm_get_locked, MsTpmSimulatorInterface, VtpmProtocolInterface},
 };
+use cpuarch::address::{Address, PhysAddr};
 
 /// vTPM platform commands (SVSM spec, section 8.1 - SVSM_VTPM_QUERY)
 ///

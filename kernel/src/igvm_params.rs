@@ -7,7 +7,6 @@
 extern crate alloc;
 
 use crate::acpi::tables::ACPICPUInfo;
-use crate::address::{PhysAddr, VirtAddr};
 use crate::cpu::efer::EFERFlags;
 use crate::error::SvsmError;
 use crate::fw_meta::SevFWMetaData;
@@ -16,6 +15,7 @@ use crate::platform::{PageStateChangeOp, PageValidateOp, SVSM_PLATFORM};
 use crate::types::PageSize;
 use crate::utils::MemoryRegion;
 use alloc::vec::Vec;
+use cpuarch::address::{PhysAddr, VirtAddr};
 use cpuarch::vmsa::VMSA;
 
 use bootlib::igvm_params::{IgvmGuestContext, IgvmParamBlock, IgvmParamPage};

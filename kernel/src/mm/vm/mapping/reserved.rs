@@ -4,8 +4,8 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::PhysAddr;
 use crate::mm::pagetable::PTEntryFlags;
+use cpuarch::address::PhysAddr;
 
 use super::{Mapping, VirtualMapping};
 

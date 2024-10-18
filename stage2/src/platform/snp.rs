@@ -4,7 +4,6 @@
 //
 // Author: Jon Lange <jlange@microsoft.com>
 
-use crate::address::{PhysAddr, VirtAddr};
 use crate::console::init_svsm_console;
 use crate::cpu::cpuid::cpuid_table;
 use crate::cpu::percpu::{current_ghcb, register_ghcb, setup_ghcb};
@@ -20,6 +19,7 @@ use crate::sev::{
 use crate::types::PageSize;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
 use crate::utils::MemoryRegion;
+use cpuarch::address::{PhysAddr, VirtAddr};
 
 #[cfg(debug_assertions)]
 use crate::mm::virt_to_phys;

@@ -14,6 +14,7 @@ use crate::{
     sev::secrets_page::VMPCK_SIZE,
     types::PAGE_SIZE,
 };
+use cpuarch::address::{Address, VirtAddr};
 
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 

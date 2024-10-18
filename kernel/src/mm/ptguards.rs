@@ -5,7 +5,6 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::pagetable::PTEntryFlags;
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::percpu::this_cpu;
 use crate::cpu::tlb::flush_address_percpu;
 use crate::error::SvsmError;
@@ -14,6 +13,7 @@ use crate::mm::virtualrange::VRangeAlloc;
 use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 use core::marker::PhantomData;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 /// Guard for a per-CPU page mapping to ensure adequate cleanup if drop.
 #[derive(Debug)]

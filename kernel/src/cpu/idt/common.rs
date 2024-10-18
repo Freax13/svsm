@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-use crate::address::{Address, VirtAddr};
 use crate::cpu::control_regs::{read_cr0, read_cr4};
 use crate::cpu::efer::read_efer;
 use crate::cpu::gdt::gdt;
@@ -19,6 +18,7 @@ use crate::types::{Bytes, SVSM_CS};
 use alloc::boxed::Box;
 use core::arch::{asm, global_asm};
 use core::mem;
+use cpuarch::address::{Address, VirtAddr};
 
 pub const DE_VECTOR: usize = 0;
 pub const DB_VECTOR: usize = 1;

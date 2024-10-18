@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::config::SvsmConfig;
 use crate::error::SvsmError;
 use crate::igvm_params::IgvmParams;
@@ -14,6 +13,7 @@ use crate::platform::{PageStateChangeOp, PageValidateOp, SvsmPlatform};
 use crate::types::PageSize;
 use crate::utils::MemoryRegion;
 use bootlib::kernel_launch::KernelLaunchInfo;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 struct IgvmParamInfo<'a> {
     virt_addr: VirtAddr,

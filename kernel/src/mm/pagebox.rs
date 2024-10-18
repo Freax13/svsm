@@ -7,7 +7,6 @@ use zerocopy::FromZeros;
 // Author: Carlos López <carlos.lopez@suse.com>
 use super::alloc::{allocate_pages, free_page, get_order, AllocError, MAX_ORDER};
 use super::PAGE_SIZE;
-use crate::address::VirtAddr;
 use crate::error::SvsmError;
 use core::borrow;
 use core::marker::PhantomData;
@@ -15,6 +14,7 @@ use core::mem::{self, ManuallyDrop, MaybeUninit};
 use core::num::NonZeroUsize;
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
+use cpuarch::address::VirtAddr;
 
 /// An abstraction, similar to a `Box`, for types that need to be allocated
 /// using page allocator directly.

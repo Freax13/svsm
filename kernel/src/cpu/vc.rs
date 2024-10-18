@@ -5,8 +5,6 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::idt::common::X86ExceptionContext;
-use crate::address::Address;
-use crate::address::VirtAddr;
 use crate::cpu::cpuid::{cpuid_table_raw, CpuidLeaf};
 use crate::cpu::percpu::current_ghcb;
 use crate::cpu::percpu::this_cpu;
@@ -19,6 +17,8 @@ use crate::insn_decode::{
 use crate::mm::GuestPtr;
 use crate::sev::ghcb::GHCB;
 use core::fmt;
+use cpuarch::address::Address;
+use cpuarch::address::VirtAddr;
 
 pub const SVM_EXIT_EXCP_BASE: usize = 0x40;
 pub const SVM_EXIT_LAST_EXCP: usize = 0x5f;

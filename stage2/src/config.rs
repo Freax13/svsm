@@ -4,12 +4,12 @@
 //
 // Author: Jon Lange (jlange@microsoft.com)
 
-use crate::address::PhysAddr;
 use crate::error::SvsmError;
 use crate::fw_cfg::FwCfg;
 use crate::igvm_params::IgvmParams;
 use crate::serial::SERIAL_PORT;
 use crate::utils::MemoryRegion;
+use cpuarch::address::PhysAddr;
 
 #[derive(Debug)]
 pub enum SvsmConfig<'a> {

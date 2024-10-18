@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::percpu::{this_cpu, this_cpu_shared, PERCPU_AREAS, PERCPU_VMSAS};
 use crate::cpu::vmsa::{vmsa_mut_ref_from_vaddr, vmsa_ref_from_vaddr};
@@ -24,6 +23,7 @@ use crate::sev::utils::{
 use crate::sev::vmsa::VMSAControl;
 use crate::types::{PageSize, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::zero_mem_region;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 use cpuarch::vmsa::VMSA;
 
 const SVSM_REQ_CORE_REMAP_CA: u32 = 0;

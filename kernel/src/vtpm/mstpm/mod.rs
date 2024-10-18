@@ -21,11 +21,11 @@ use libmstpm::bindings::{
 };
 
 use crate::{
-    address::VirtAddr,
     protocols::{errors::SvsmReqError, vtpm::TpmPlatformCommand},
     types::PAGE_SIZE,
     vtpm::{MsTpmSimulatorInterface, VtpmInterface, VtpmProtocolInterface},
 };
+use cpuarch::address::VirtAddr;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct MsTpm {

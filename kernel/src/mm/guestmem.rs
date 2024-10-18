@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-use crate::address::{Address, VirtAddr};
 use crate::cpu::x86::smap::{clac, stac};
 use crate::error::SvsmError;
 use crate::insn_decode::{InsnError, InsnMachineMem};
@@ -16,6 +15,7 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use core::ffi::c_char;
 use core::mem::{size_of, MaybeUninit};
+use cpuarch::address::{Address, VirtAddr};
 use syscall::PATH_MAX;
 use zerocopy::FromBytes;
 

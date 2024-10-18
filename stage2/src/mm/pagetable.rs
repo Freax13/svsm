@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::flush_tlb_global_sync;
 use crate::error::SvsmError;
 use crate::mm::alloc::allocate_page_zeroed;
@@ -16,6 +15,7 @@ use crate::utils::MemoryRegion;
 use bitflags::bitflags;
 use core::cmp;
 use core::ops::{Index, IndexMut};
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 /// Number of entries in a page table (4KB/8B).
 const ENTRY_COUNT: usize = 512;

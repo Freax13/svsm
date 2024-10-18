@@ -4,10 +4,10 @@
 //
 // Author: Jon Lange (jlange@microsoft.com)
 
-use crate::address::{PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::mm::PAGE_SIZE;
 use crate::utils::MemoryRegion;
+use cpuarch::address::{PhysAddr, VirtAddr};
 
 use bootlib::igvm_params::{IgvmGuestContext, IgvmParamBlock, IgvmParamPage};
 use core::mem::size_of;

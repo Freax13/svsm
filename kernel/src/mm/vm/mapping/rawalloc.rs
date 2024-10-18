@@ -6,11 +6,11 @@
 
 use core::iter;
 
-use crate::address::PhysAddr;
 use crate::error::SvsmError;
 use crate::mm::alloc::PageRef;
 use crate::types::{PAGE_SHIFT, PAGE_SIZE};
 use crate::utils::align_up;
+use cpuarch::address::PhysAddr;
 
 extern crate alloc;
 use alloc::vec::Vec;

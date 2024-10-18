@@ -4,12 +4,12 @@
 //
 // Author: Carlos López <carlos.lopez@suse.com>
 
-use crate::address::Address;
 use crate::types::PageSize;
+use cpuarch::address::Address;
 
 /// An abstraction over a memory region, expressed in terms of physical
-/// ([`PhysAddr`](crate::address::PhysAddr)) or virtual
-/// ([`VirtAddr`](crate::address::VirtAddr)) addresses.
+/// ([`PhysAddr`](cpuarch::address::PhysAddr)) or virtual
+/// ([`VirtAddr`](cpuarch::address::VirtAddr)) addresses.
 #[derive(Clone, Copy, Debug)]
 pub struct MemoryRegion<A> {
     start: A,

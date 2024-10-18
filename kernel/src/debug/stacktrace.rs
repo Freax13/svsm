@@ -5,13 +5,13 @@
 // Author: Nicolai Stange <nstange@suse.de>
 
 use crate::{
-    address::VirtAddr,
     cpu::idt::common::{is_exception_handler_return_site, X86ExceptionContext},
     cpu::percpu::this_cpu,
     mm::address_space::STACK_SIZE,
     utils::MemoryRegion,
 };
 use core::{arch::asm, mem};
+use cpuarch::address::VirtAddr;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct StackFrame {

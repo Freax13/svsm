@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-use crate::address::PhysAddr;
 use crate::config::SvsmConfig;
 use crate::cpu::percpu::current_ghcb;
 use crate::error::SvsmError;
@@ -18,6 +17,7 @@ use crate::types::{PageSize, PAGE_SIZE};
 use crate::utils::{zero_mem_region, MemoryRegion};
 use alloc::vec::Vec;
 use bootlib::kernel_launch::KernelLaunchInfo;
+use cpuarch::address::PhysAddr;
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
 use core::fmt;

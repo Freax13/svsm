@@ -9,7 +9,6 @@ extern crate alloc;
 use core::slice;
 
 use crate::acpi::tables::{load_acpi_cpu_info, ACPICPUInfo};
-use crate::address::PhysAddr;
 use crate::error::SvsmError;
 use crate::fw_cfg::FwCfg;
 use crate::fw_meta::{parse_fw_meta_data, SevFWMetaData};
@@ -18,6 +17,7 @@ use crate::mm::{PerCPUPageMappingGuard, PAGE_SIZE, SIZE_1G};
 use crate::serial::SERIAL_PORT;
 use crate::utils::MemoryRegion;
 use alloc::vec::Vec;
+use cpuarch::address::PhysAddr;
 use cpuarch::vmsa::VMSA;
 
 fn check_ovmf_regions(

@@ -4,9 +4,9 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::PhysAddr;
 use crate::error::SvsmError;
 use crate::mm::pagetable::PTEntryFlags;
+use cpuarch::address::PhysAddr;
 
 use super::rawalloc::RawAllocMapping;
 use super::{Mapping, VMFileMappingFlags, VirtualMapping};

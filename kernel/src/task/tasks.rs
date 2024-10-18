@@ -13,7 +13,6 @@ use core::mem::size_of;
 use core::num::NonZeroUsize;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use crate::address::{Address, VirtAddr};
 use crate::cpu::idt::svsm::return_new_task;
 use crate::cpu::percpu::PerCpu;
 use crate::cpu::sse::{get_xsave_area_size, sse_restore_context};
@@ -32,6 +31,7 @@ use crate::mm::{
 use crate::syscall::{Obj, ObjError, ObjHandle};
 use crate::types::{SVSM_USER_CS, SVSM_USER_DS};
 use crate::utils::MemoryRegion;
+use cpuarch::address::{Address, VirtAddr};
 use intrusive_collections::{intrusive_adapter, LinkedListAtomicLink};
 
 use super::schedule::{current_task_terminated, schedule};

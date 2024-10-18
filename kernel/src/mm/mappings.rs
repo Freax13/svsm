@@ -4,11 +4,11 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::VirtAddr;
 use crate::error::SvsmError;
 use crate::fs::FileHandle;
 use crate::mm::vm::{Mapping, VMFileMapping, VMFileMappingFlags, VMalloc, VMR};
 use crate::task::current_task;
+use cpuarch::address::VirtAddr;
 
 use core::ops::Deref;
 

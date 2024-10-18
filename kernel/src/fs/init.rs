@@ -4,9 +4,9 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr};
 use crate::error::SvsmError;
 use crate::mm::ptguards::PerCPUPageMappingGuard;
+use cpuarch::address::{Address, PhysAddr};
 use packit::PackItArchiveDecoder;
 
 use super::*;

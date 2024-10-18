@@ -5,7 +5,6 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::utils::{rmp_adjust, RMPFlags};
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::mm::{virt_to_phys, PageBox};
 use crate::platform::guest_cpu::GuestCpuState;
@@ -14,6 +13,7 @@ use crate::types::{PageSize, PAGE_SIZE_2M};
 use core::mem::{size_of, ManuallyDrop};
 use core::ops::{Deref, DerefMut};
 use core::ptr;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 use cpuarch::vmsa::{VmsaEventInject, VmsaEventType, VMSA};
 

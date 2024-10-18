@@ -15,12 +15,13 @@ use super::common::{
     MF_VECTOR, NMI_VECTOR, NM_VECTOR, NP_VECTOR, OF_VECTOR, PF_VECTOR, SS_VECTOR, SX_VECTOR,
     TS_VECTOR, UD_VECTOR, VC_VECTOR, XF_VECTOR,
 };
-use crate::address::VirtAddr;
 use crate::cpu::registers::RFlags;
 use crate::cpu::X86ExceptionContext;
 use crate::debug::gdbstub::svsm_gdbstub::handle_debug_exception;
 use crate::platform::SVSM_PLATFORM;
 use crate::task::{is_task_fault, terminate};
+use cpuarch::address::VirtAddr;
+
 use core::arch::global_asm;
 
 use crate::syscall::*;

@@ -11,7 +11,6 @@
 #![cfg_attr(all(test, test_in_svsm), reexport_test_harness_main = "test_main")]
 
 pub mod acpi;
-pub mod address;
 pub mod config;
 pub mod console;
 pub mod cpu;

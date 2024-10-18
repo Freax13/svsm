@@ -4,9 +4,9 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::VirtAddr;
 use crate::types::{SVSM_CS, SVSM_DS};
 use core::arch::asm;
+use cpuarch::address::VirtAddr;
 
 #[repr(C, packed(2))]
 #[derive(Clone, Copy, Debug, Default)]

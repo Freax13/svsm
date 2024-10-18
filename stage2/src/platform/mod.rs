@@ -6,7 +6,6 @@
 
 use core::ops::{Deref, DerefMut};
 
-use crate::address::{PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::io::IOPort;
 use crate::platform::native::NativePlatform;
@@ -16,6 +15,7 @@ use crate::types::PageSize;
 use crate::utils;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
 use crate::utils::MemoryRegion;
+use cpuarch::address::{PhysAddr, VirtAddr};
 
 use bootlib::platform::SvsmPlatformType;
 

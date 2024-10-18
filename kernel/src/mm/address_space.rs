@@ -4,9 +4,9 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{PhysAddr, VirtAddr};
 use crate::mm::pagetable::{PageFrame, PageTable};
 use crate::utils::immut_after_init::ImmutAfterInitCell;
+use cpuarch::address::{PhysAddr, VirtAddr};
 
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(not(any(test, target_os = "none")), expect(dead_code))]
@@ -98,13 +98,13 @@ pub fn phys_to_virt(paddr: PhysAddr) -> VirtAddr {
 
 #[cfg(not(target_os = "none"))]
 pub fn virt_to_phys(vaddr: VirtAddr) -> PhysAddr {
-    use crate::address::Address;
+    use cpuarch::address::Address;
     PhysAddr::from(vaddr.bits())
 }
 
 #[cfg(not(target_os = "none"))]
 pub fn phys_to_virt(paddr: PhysAddr) -> VirtAddr {
-    use crate::address::Address;
+    use cpuarch::address::Address;
     VirtAddr::from(paddr.bits())
 }
 

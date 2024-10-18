@@ -4,11 +4,11 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::error::SvsmError;
 use crate::locking::SpinLock;
 use crate::types::PAGE_SIZE;
 use core::alloc::Layout;
+use cpuarch::address::{Address, VirtAddr};
 
 struct BumpAllocatorState {
     start: VirtAddr,

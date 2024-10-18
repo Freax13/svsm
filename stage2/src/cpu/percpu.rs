@@ -20,7 +20,6 @@
 // TODO: FIx this
 // TODO: FIx this
 
-use crate::address::VirtAddr;
 use crate::error::SvsmError;
 use crate::sev::ghcb::{Ghcb, GhcbPage};
 use core::cell::{Ref, RefCell};

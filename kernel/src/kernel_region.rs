@@ -4,9 +4,9 @@
 //
 // Author: Jon Lange (jlange@microsoft.com)
 
-use crate::address::PhysAddr;
 use crate::utils::MemoryRegion;
 use bootlib::kernel_launch::KernelLaunchInfo;
+use cpuarch::address::PhysAddr;
 
 pub fn new_kernel_region(launch_info: &KernelLaunchInfo) -> MemoryRegion<PhysAddr> {
     let start = PhysAddr::from(launch_info.kernel_region_phys_start);

@@ -4,12 +4,12 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
 use crate::mm::pagetable::PTEntryFlags;
 use crate::mm::vm::VMR;
 use crate::types::{PageSize, PAGE_SHIFT};
+use cpuarch::address::{PhysAddr, VirtAddr};
 
 use intrusive_collections::rbtree::Link;
 use intrusive_collections::{intrusive_adapter, KeyAdapter};

@@ -4,10 +4,10 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::types::PAGE_SIZE;
 use core::arch::asm;
 use core::ops::{Add, BitAnd, Not, Sub};
+use cpuarch::address::{Address, VirtAddr};
 
 pub fn align_up<T>(addr: T, align: T) -> T
 where

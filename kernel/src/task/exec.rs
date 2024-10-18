@@ -4,13 +4,13 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::error::SvsmError;
 use crate::fs::open;
 use crate::mm::vm::VMFileMappingFlags;
 use crate::mm::USER_MEM_END;
 use crate::task::{create_user_task, current_task, schedule};
 use crate::types::PAGE_SIZE;
+use cpuarch::address::{Address, VirtAddr};
 use elf::{Elf64File, Elf64PhdrFlags};
 
 fn convert_elf_phdr_flags(flags: Elf64PhdrFlags) -> VMFileMappingFlags {

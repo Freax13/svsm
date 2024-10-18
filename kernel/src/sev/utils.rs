@@ -4,12 +4,12 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::error::SvsmError;
 use crate::types::{PageSize, GUEST_VMPL, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 use core::arch::asm;
 use core::fmt;
+use cpuarch::address::{Address, VirtAddr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[expect(non_camel_case_types)]

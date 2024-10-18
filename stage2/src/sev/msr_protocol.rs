@@ -4,12 +4,12 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr};
 use crate::cpu::irq_state::raw_irqs_disable;
 use crate::cpu::msr::{read_msr, write_msr, SEV_GHCB};
 use crate::error::SvsmError;
 use crate::utils::halt;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
+use cpuarch::address::{Address, PhysAddr};
 
 use super::utils::raw_vmgexit;
 

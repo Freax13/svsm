@@ -8,7 +8,6 @@ extern crate alloc;
 
 use super::gdt_mut;
 use super::tss::{X86Tss, IST_DF};
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::idt::common::INT_INJ_VECTOR;
 use crate::cpu::tss::TSS_LIMIT;
 use crate::cpu::vmsa::{init_guest_vmsa, init_svsm_vmsa};
@@ -39,6 +38,7 @@ use core::mem::size_of;
 use core::ptr;
 use core::slice::Iter;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 use cpuarch::vmsa::{VMSASegment, VMSA};
 
 #[derive(Copy, Clone, Debug)]

@@ -5,11 +5,11 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 use super::features::cpu_has_pge;
-use crate::address::{Address, PhysAddr};
 use crate::cpu::features::{cpu_has_smap, cpu_has_smep};
 use crate::platform::SvsmPlatform;
 use bitflags::bitflags;
 use core::arch::asm;
+use cpuarch::address::{Address, PhysAddr};
 
 pub fn cr0_init() {
     let mut cr0 = read_cr0();

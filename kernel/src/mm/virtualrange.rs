@@ -4,13 +4,13 @@
 //
 // Author: Roy Hopkins <rhopkins@suse.de>
 
-use crate::address::VirtAddr;
 use crate::cpu::percpu::this_cpu;
 use crate::error::SvsmError;
 use crate::types::{PAGE_SHIFT, PAGE_SHIFT_2M, PAGE_SIZE, PAGE_SIZE_2M};
 use crate::utils::bitmap_allocator::{BitmapAllocator, BitmapAllocator1024};
 use crate::utils::MemoryRegion;
 use core::fmt::Debug;
+use cpuarch::address::VirtAddr;
 
 use super::{
     SVSM_PERCPU_TEMP_BASE_2M, SVSM_PERCPU_TEMP_BASE_4K, SVSM_PERCPU_TEMP_END_2M,
@@ -145,8 +145,8 @@ impl Drop for VRangeAlloc {
 #[cfg(test)]
 mod tests {
     use super::VirtualRange;
-    use crate::address::VirtAddr;
     use crate::types::{PAGE_SHIFT, PAGE_SHIFT_2M, PAGE_SIZE, PAGE_SIZE_2M};
+    use cpuarch::address::VirtAddr;
 
     #[test]
     fn test_alloc_no_overlap_4k() {

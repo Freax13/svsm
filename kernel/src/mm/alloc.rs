@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::mem::{copy_bytes, write_bytes};
 use crate::error::SvsmError;
 use crate::locking::SpinLock;
@@ -14,6 +13,7 @@ use crate::utils::{align_down, align_up, zero_mem_region};
 use core::alloc::{GlobalAlloc, Layout};
 use core::mem::size_of;
 use core::ptr;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 #[cfg(any(test, fuzzing))]
 use crate::locking::LockGuard;

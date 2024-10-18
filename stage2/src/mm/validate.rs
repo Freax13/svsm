@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::error::SvsmError;
 use crate::locking::SpinLock;
 use crate::mm::alloc::allocate_zeroed;
@@ -13,6 +12,7 @@ use crate::types::PAGE_SIZE;
 use crate::utils::MemoryRegion;
 use core::alloc::Layout;
 use core::num::NonZeroUsize;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 static VALID_BITMAP: SpinLock<Option<ValidBitmap>> = SpinLock::new(None);
 

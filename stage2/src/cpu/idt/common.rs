@@ -4,12 +4,12 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
 use crate::locking::spinlock::LockGuard;
 use crate::locking::SpinLock;
 use crate::types::SVSM_CS;
 use core::arch::{asm, global_asm};
+use cpuarch::address::{Address, VirtAddr};
 
 pub const DF_VECTOR: usize = 8;
 pub const HV_VECTOR: usize = 28;

@@ -4,10 +4,10 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::VirtAddr;
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
 use crate::sev::vmsa::VMPL_MAX;
 use crate::types::GUEST_VMPL;
+use cpuarch::address::VirtAddr;
 
 extern crate alloc;
 use alloc::boxed::Box;

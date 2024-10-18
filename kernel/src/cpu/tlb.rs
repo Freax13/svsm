@@ -4,8 +4,8 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::cpu::control_regs::{read_cr4, write_cr4, CR4Flags};
+use cpuarch::address::{Address, VirtAddr};
 
 use core::arch::asm;
 

@@ -7,7 +7,6 @@
 #![no_std]
 #![no_main]
 
-mod address;
 mod boot_stage2;
 mod config;
 mod console;
@@ -29,7 +28,6 @@ mod utils;
 #[cfg(all(feature = "mstpm", not(test)))]
 mod vtpm;
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::config::SvsmConfig;
 use crate::console::install_console_logger;
 use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
@@ -57,6 +55,7 @@ use core::panic::PanicInfo;
 use core::ptr::{addr_of, addr_of_mut};
 use core::slice;
 use cpu::percpu::shutdown_ghcb;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 use cpuarch::snp_cpuid::SnpCpuidTable;
 use elf::ElfError;
 use locking::spinlock::LockGuard;

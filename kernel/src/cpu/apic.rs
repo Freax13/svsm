@@ -4,7 +4,6 @@
 //
 // Author: Jon Lange (jlange@microsoft.com)
 
-use crate::address::VirtAddr;
 use crate::cpu::idt::common::INT_INJ_VECTOR;
 use crate::cpu::percpu::{current_ghcb, this_cpu, PerCpuShared, PERCPU_AREAS};
 use crate::error::ApicError::Emulation;
@@ -15,6 +14,7 @@ use crate::platform::SVSM_PLATFORM;
 use crate::requests::SvsmCaa;
 use crate::sev::hv_doorbell::HVExtIntStatus;
 use crate::types::GUEST_VMPL;
+use cpuarch::address::VirtAddr;
 
 use bitfield_struct::bitfield;
 use core::sync::atomic::Ordering;

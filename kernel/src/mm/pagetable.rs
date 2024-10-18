@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::control_regs::{write_cr3, CR0Flags, CR4Flags};
 use crate::cpu::efer::EFERFlags;
 use crate::cpu::flush_tlb_global_sync;
@@ -24,6 +23,7 @@ use bitflags::bitflags;
 use core::cmp;
 use core::ops::{Index, IndexMut};
 use core::ptr::NonNull;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 extern crate alloc;
 use alloc::boxed::Box;

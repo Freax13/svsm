@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-use crate::address::{Address, PhysAddr};
 use crate::config::SvsmConfig;
 use crate::cpu::percpu::PERCPU_VMSAS;
 use crate::error::SvsmError;
@@ -14,6 +13,7 @@ use crate::locking::RWLock;
 use crate::utils::MemoryRegion;
 use alloc::vec::Vec;
 use bootlib::kernel_launch::KernelLaunchInfo;
+use cpuarch::address::{Address, PhysAddr};
 
 use super::pagetable::LAUNCH_VMSA_ADDR;
 

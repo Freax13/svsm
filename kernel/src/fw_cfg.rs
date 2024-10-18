@@ -6,10 +6,10 @@
 
 extern crate alloc;
 
-use crate::address::{Address, PhysAddr};
 use crate::error::SvsmError;
 use crate::mm::pagetable::max_phys_addr;
 use crate::utils::MemoryRegion;
+use cpuarch::address::{Address, PhysAddr};
 
 use super::io::IOPort;
 use super::string::FixedString;

@@ -10,8 +10,8 @@ extern "C" {
 }
 
 use super::idt::common::X86ExceptionContext;
-use crate::address::{Address, VirtAddr};
 use core::mem;
+use cpuarch::address::{Address, VirtAddr};
 
 #[repr(C, packed)]
 struct ExceptionTableEntry {

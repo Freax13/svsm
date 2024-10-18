@@ -11,7 +11,6 @@
 //
 #[cfg(feature = "enable-gdb")]
 pub mod svsm_gdbstub {
-    use crate::address::{Address, VirtAddr};
     use crate::cpu::control_regs::read_cr3;
     use crate::cpu::idt::common::{X86ExceptionContext, BP_VECTOR, DB_VECTOR, VC_VECTOR};
     use crate::cpu::percpu::this_cpu;
@@ -26,6 +25,7 @@ pub mod svsm_gdbstub {
     use core::arch::asm;
     use core::fmt;
     use core::sync::atomic::{AtomicBool, Ordering};
+    use cpuarch::address::{Address, VirtAddr};
     use gdbstub::common::{Signal, Tid};
     use gdbstub::conn::Connection;
     use gdbstub::stub::state_machine::GdbStubStateMachine;

@@ -7,7 +7,6 @@
 use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 
-use crate::address::VirtAddr;
 use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::mem::{copy_bytes, write_bytes};
 use crate::cpu::percpu::this_cpu;
@@ -20,6 +19,7 @@ use crate::platform::{PageStateChangeOp, PageValidateOp, SVSM_PLATFORM};
 use crate::protocols::errors::SvsmReqError;
 use crate::types::{PageSize, PAGE_SIZE};
 use crate::utils::MemoryRegion;
+use cpuarch::address::VirtAddr;
 
 use zerocopy::{FromBytes, FromZeros};
 

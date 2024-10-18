@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::flush_tlb_global_sync;
 use crate::cpu::msr::{write_msr, SEV_GHCB};
 use crate::error::SvsmError;
@@ -18,6 +17,7 @@ use crate::platform::PageStateChangeOp;
 use crate::sev::utils::raw_vmgexit;
 use crate::types::{Bytes, PageSize, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 use core::mem::{self, offset_of};
 use core::ops::Deref;

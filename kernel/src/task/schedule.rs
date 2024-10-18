@@ -32,7 +32,6 @@ extern crate alloc;
 
 use super::INITIAL_TASK_ID;
 use super::{Task, TaskListAdapter, TaskPointer, TaskRunListAdapter};
-use crate::address::Address;
 use crate::cpu::percpu::{irq_nesting_count, this_cpu};
 use crate::cpu::sse::sse_restore_context;
 use crate::cpu::sse::sse_save_context;
@@ -44,6 +43,7 @@ use core::arch::{asm, global_asm};
 use core::cell::OnceCell;
 use core::mem::offset_of;
 use core::ptr::null_mut;
+use cpuarch::address::Address;
 use intrusive_collections::LinkedList;
 
 /// A RunQueue implementation that uses an RBTree to efficiently sort the priority

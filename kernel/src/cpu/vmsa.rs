@@ -4,9 +4,9 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, VirtAddr};
 use crate::sev::status::{sev_flags, SEVStatusFlags};
 use crate::types::{GUEST_VMPL, SVSM_CS, SVSM_CS_FLAGS, SVSM_DS, SVSM_DS_FLAGS};
+use cpuarch::address::{Address, VirtAddr};
 use cpuarch::vmsa::{VMSASegment, VMSA};
 
 use super::control_regs::{read_cr0, read_cr3, read_cr4};

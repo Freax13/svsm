@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use bitflags::bitflags;
 
 use super::{VMPageFaultResolution, VirtualMapping};
-use crate::address::PhysAddr;
 use crate::error::SvsmError;
 use crate::fs::FileHandle;
 use crate::mm::vm::VMR;
@@ -19,6 +18,7 @@ use crate::mm::PageRef;
 use crate::mm::{pagetable::PTEntryFlags, PAGE_SIZE};
 use crate::types::PAGE_SHIFT;
 use crate::utils::align_up;
+use cpuarch::address::PhysAddr;
 
 bitflags! {
     #[derive(Debug, PartialEq, Copy, Clone)]

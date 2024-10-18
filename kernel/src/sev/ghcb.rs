@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-use crate::address::{Address, PhysAddr, VirtAddr};
 use crate::cpu::msr::{write_msr, SEV_GHCB};
 use crate::cpu::percpu::this_cpu;
 use crate::cpu::{flush_tlb_global_sync, IrqGuard, X86GeneralRegs};
@@ -18,6 +17,7 @@ use crate::sev::hv_doorbell::HVDoorbell;
 use crate::sev::utils::raw_vmgexit;
 use crate::types::{Bytes, PageSize, GUEST_VMPL, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
+use cpuarch::address::{Address, PhysAddr, VirtAddr};
 
 use crate::mm::PageBox;
 use core::arch::global_asm;
