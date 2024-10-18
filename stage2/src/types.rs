@@ -23,12 +23,6 @@ impl From<PageSize> for usize {
     }
 }
 
-#[expect(clippy::identity_op)]
-pub const SVSM_CS: u16 = 1 * 8;
-pub const SVSM_DS: u16 = 2 * 8;
-
-pub const MAX_CPUS: usize = 512;
-
 /// Length in byte which represents maximum 8 bytes(u64)
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Bytes {

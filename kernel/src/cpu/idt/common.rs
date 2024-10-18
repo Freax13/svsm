@@ -8,7 +8,7 @@ extern crate alloc;
 
 use crate::cpu::control_regs::{read_cr0, read_cr4};
 use crate::cpu::efer::read_efer;
-use crate::cpu::gdt::gdt;
+use crate::cpu::gdt;
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
 use crate::insn_decode::{InsnError, InsnMachineCtx, InsnMachineMem, Register, SegRegister};
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};

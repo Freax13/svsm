@@ -286,7 +286,9 @@ pub extern "C" fn svsm_start(li: &KernelLaunchInfo, vb_addr: usize) {
     // SAFETY: we trust the previous stage to pass a valid pointer
     unsafe { init_valid_bitmap_ptr(new_kernel_region(&launch_info), vb_ptr) };
 
-    gdt().load();
+    unsafe {
+        gdt().load();
+    }
     early_idt_init();
 
     // Capture the debug serial port before the launch info disappears from
