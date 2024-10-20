@@ -30,7 +30,7 @@ mod vtpm;
 
 use crate::config::SvsmConfig;
 use crate::console::install_console_logger;
-use crate::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
+use crate::cpu::cpuid::register_cpuid_table;
 use crate::cpu::gdt::GDT;
 use crate::cpu::idt::stage2::{early_idt_init, early_idt_init_no_ghcb};
 use crate::error::SvsmError;
@@ -54,6 +54,7 @@ use core::ops::{Deref, DerefMut};
 use core::panic::PanicInfo;
 use core::ptr::{addr_of, addr_of_mut};
 use core::slice;
+use cpu::cpuid::CPUID_PAGE;
 use cpu::percpu::shutdown_ghcb;
 use cpuarch::address::{Address, PhysAddr, VirtAddr};
 use cpuarch::snp_cpuid::SnpCpuidTable;
@@ -124,7 +125,7 @@ fn setup_env(
         .env_setup_late(debug_serial_port)
         .expect("Late environment setup failed");
 
-    dump_cpuid_table();
+    CPUID_PAGE.dump();
 }
 
 fn pgtable() -> LockGuard<'static, impl DerefMut<Target = PageTable>> {

@@ -5,7 +5,7 @@
 // Author: Jon Lange <jlange@microsoft.com>
 
 use crate::console::init_svsm_console;
-use crate::cpu::cpuid::{cpuid_table, CpuidResult};
+use crate::cpu::cpuid::CPUID_PAGE;
 use crate::cpu::percpu::{current_ghcb, this_cpu, PerCpu};
 use crate::error::ApicError::Registration;
 use crate::error::SvsmError;
@@ -26,6 +26,7 @@ use crate::types::PageSize;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
 use crate::utils::MemoryRegion;
 use cpuarch::address::{Address, PhysAddr, VirtAddr};
+use cpuarch::cpuid::CpuidResult;
 
 #[cfg(debug_assertions)]
 use crate::mm::virt_to_phys;
@@ -138,8 +139,9 @@ impl SvsmPlatform for SnpPlatform {
 
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks {
         // Find physical address size.
-        let processor_capacity =
-            cpuid_table(0x80000008).expect("Can not get physical address size from CPUID table");
+        let processor_capacity = CPUID_PAGE
+            .cpuid_table(0x80000008)
+            .expect("Can not get physical address size from CPUID table");
         if vtom_enabled() {
             let vtom = *VTOM;
             PageEncryptionMasks {
@@ -150,8 +152,9 @@ impl SvsmPlatform for SnpPlatform {
             }
         } else {
             // Find C-bit position.
-            let sev_capabilities =
-                cpuid_table(0x8000001f).expect("Can not get C-Bit position from CPUID table");
+            let sev_capabilities = CPUID_PAGE
+                .cpuid_table(0x8000001f)
+                .expect("Can not get C-Bit position from CPUID table");
             let c_bit = sev_capabilities.ebx & 0x3f;
             PageEncryptionMasks {
                 private_pte_mask: 1 << c_bit,
@@ -163,7 +166,7 @@ impl SvsmPlatform for SnpPlatform {
     }
 
     fn cpuid(&self, eax: u32) -> Option<CpuidResult> {
-        cpuid_table(eax)
+        CPUID_PAGE.cpuid_table(eax)
     }
 
     fn setup_guest_host_comm(&mut self, cpu: &PerCpu, is_bsp: bool) {

@@ -5,7 +5,6 @@
 // Author: Jon Lange <jlange@microsoft.com>
 
 use crate::console::init_svsm_console;
-use crate::cpu::cpuid::CpuidResult;
 use crate::cpu::msr::write_msr;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
@@ -14,6 +13,7 @@ use crate::platform::{PageEncryptionMasks, PageStateChangeOp, PageValidateOp, Sv
 use crate::types::PageSize;
 use crate::utils::MemoryRegion;
 use cpuarch::address::{PhysAddr, VirtAddr};
+use cpuarch::cpuid::CpuidResult;
 
 #[cfg(debug_assertions)]
 use crate::mm::virt_to_phys;

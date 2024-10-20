@@ -5,7 +5,6 @@
 // Author: Peter Fang <peter.fang@intel.com>
 
 use crate::console::init_svsm_console;
-use crate::cpu::cpuid::CpuidResult;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::IOPort;
@@ -15,6 +14,7 @@ use crate::types::PageSize;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
 use crate::utils::{zero_mem_region, MemoryRegion};
 use cpuarch::address::{PhysAddr, VirtAddr};
+use cpuarch::cpuid::CpuidResult;
 use tdx_tdcall::tdx::{
     td_accept_memory, tdvmcall_halt, tdvmcall_io_read_16, tdvmcall_io_read_32, tdvmcall_io_read_8,
     tdvmcall_io_write_16, tdvmcall_io_write_32, tdvmcall_io_write_8,

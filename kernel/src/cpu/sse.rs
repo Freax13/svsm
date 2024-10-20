@@ -5,9 +5,9 @@
 // Author: Vasant Karasulli <vkarasulli@suse.de>
 
 use crate::cpu::control_regs::{cr0_sse_enable, cr4_osfxsr_enable, cr4_xsave_enable};
-use crate::cpu::cpuid::CpuidResult;
 use core::arch::asm;
 use core::arch::x86_64::{_xgetbv, _xsetbv};
+use cpuarch::cpuid::CpuidResult;
 
 const CPUID_EDX_SSE1: u32 = 25;
 const CPUID_ECX_XSAVE: u32 = 26;

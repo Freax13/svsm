@@ -18,7 +18,7 @@ use cpuarch::snp_cpuid::SnpCpuidTable;
 use svsm::config::SvsmConfig;
 use svsm::console::install_console_logger;
 use svsm::cpu::control_regs::{cr0_init, cr4_init};
-use svsm::cpu::cpuid::{dump_cpuid_table, register_cpuid_table};
+use svsm::cpu::cpuid::register_cpuid_table;
 use svsm::cpu::gdt;
 use svsm::cpu::idt::svsm::{early_idt_init, idt_init};
 use svsm::cpu::percpu::current_ghcb;
@@ -361,7 +361,7 @@ pub extern "C" fn svsm_start(li: &KernelLaunchInfo, vb_addr: usize) {
         .env_setup_late(debug_serial_port)
         .expect("Late environment setup failed");
 
-    dump_cpuid_table();
+    CPUID_PAGE.dump();
 
     let mem_info = memory_info();
     print_memory_info(&mem_info);

@@ -5,7 +5,7 @@
 // Author: Jon Lange <jlange@microsoft.com>
 
 use crate::console::init_svsm_console;
-use crate::cpu::cpuid::cpuid_table;
+use crate::cpu::cpuid::CPUID_PAGE;
 use crate::cpu::percpu::{current_ghcb, register_ghcb, setup_ghcb};
 use crate::error::SvsmError;
 use crate::io::IOPort;
@@ -79,8 +79,9 @@ impl SvsmPlatform for SnpPlatform {
 
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks {
         // Find physical address size.
-        let processor_capacity =
-            cpuid_table(0x80000008).expect("Can not get physical address size from CPUID table");
+        let processor_capacity = CPUID_PAGE
+            .cpuid_table(0x80000008)
+            .expect("Can not get physical address size from CPUID table");
         if vtom_enabled() {
             let vtom = *VTOM;
             PageEncryptionMasks {
@@ -91,8 +92,9 @@ impl SvsmPlatform for SnpPlatform {
             }
         } else {
             // Find C-bit position.
-            let sev_capabilities =
-                cpuid_table(0x8000001f).expect("Can not get C-Bit position from CPUID table");
+            let sev_capabilities = CPUID_PAGE
+                .cpuid_table(0x8000001f)
+                .expect("Can not get C-Bit position from CPUID table");
             let c_bit = sev_capabilities.ebx & 0x3f;
             PageEncryptionMasks {
                 private_pte_mask: 1 << c_bit,

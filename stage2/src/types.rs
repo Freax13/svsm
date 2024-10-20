@@ -23,6 +23,8 @@ impl From<PageSize> for usize {
     }
 }
 
+// TODO: Do we need Bytes?
+
 /// Length in byte which represents maximum 8 bytes(u64)
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub enum Bytes {

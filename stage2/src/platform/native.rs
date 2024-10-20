@@ -5,13 +5,13 @@
 // Author: Jon Lange <jlange@microsoft.com>
 
 use crate::console::init_svsm_console;
-use crate::cpu::cpuid::CpuidResult;
 use crate::error::SvsmError;
 use crate::io::{IOPort, DEFAULT_IO_DRIVER};
 use crate::platform::{PageEncryptionMasks, PageStateChangeOp, PageValidateOp, SvsmPlatform};
 use crate::types::PageSize;
 use crate::utils::MemoryRegion;
 use cpuarch::address::{PhysAddr, VirtAddr};
+use cpuarch::cpuid::CpuidResult;
 
 #[cfg(debug_assertions)]
 use crate::mm::virt_to_phys;

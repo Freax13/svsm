@@ -6,7 +6,6 @@
 
 use core::ops::{Deref, DerefMut};
 
-use crate::cpu::cpuid::CpuidResult;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::IOPort;
@@ -18,6 +17,7 @@ use crate::utils;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
 use crate::utils::MemoryRegion;
 use cpuarch::address::{PhysAddr, VirtAddr};
+use cpuarch::cpuid::CpuidResult;
 
 use bootlib::platform::SvsmPlatformType;
 

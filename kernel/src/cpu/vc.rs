@@ -4,8 +4,8 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
+use super::cpuid::CPUID_PAGE;
 use super::idt::common::X86ExceptionContext;
-use crate::cpu::cpuid::cpuid_table_raw;
 use crate::cpu::percpu::current_ghcb;
 use crate::cpu::percpu::this_cpu;
 use crate::cpu::X86GeneralRegs;
@@ -217,7 +217,7 @@ fn snp_cpuid(ctx: &mut X86ExceptionContext) -> Result<(), SvsmError> {
         0
     };
 
-    let Some(ret) = cpuid_table_raw(cpuid_fn, cpuid_subfn, xcr0_in, 0) else {
+    let Some(ret) = CPUID_PAGE.cpuid_table_raw(cpuid_fn, cpuid_subfn, xcr0_in, 0) else {
         return Err(VcError::new(ctx, VcErrorType::UnknownCpuidLeaf).into());
     };
 
