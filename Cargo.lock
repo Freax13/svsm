@@ -968,8 +968,6 @@ version = "0.1.0"
 [[package]]
 name = "tdx-tdcall"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6ea90455a0e1ee10fe5dd2ddd377d32c6df739ce156b6db5ad87e4c72d460ff"
 dependencies = [
  "lazy_static",
  "log",
