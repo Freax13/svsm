@@ -6,7 +6,6 @@
 
 mod schedule;
 mod tasks;
-mod waiting;
 
 pub use schedule::{current_task_terminated, schedule, terminate, RunQueue};
 
