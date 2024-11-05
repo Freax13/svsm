@@ -10,37 +10,14 @@ use crate::cpu::efer::read_efer;
 use crate::cpu::gdt::gdt;
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
 use crate::insn_decode::{InsnError, InsnMachineCtx, Register, SegRegister};
-use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
+use crate::locking::{RWLock, WriteLockGuard};
 use crate::platform::SVSM_PLATFORM;
 use crate::types::{Bytes, SVSM_CS};
 use core::arch::{asm, global_asm};
-use core::mem;
 
-pub const DE_VECTOR: usize = 0;
-pub const DB_VECTOR: usize = 1;
-pub const NMI_VECTOR: usize = 2;
-pub const BP_VECTOR: usize = 3;
-pub const OF_VECTOR: usize = 4;
-pub const BR_VECTOR: usize = 5;
-pub const UD_VECTOR: usize = 6;
-pub const NM_VECTOR: usize = 7;
 pub const DF_VECTOR: usize = 8;
-pub const CSO_VECTOR: usize = 9;
-pub const TS_VECTOR: usize = 10;
-pub const NP_VECTOR: usize = 11;
-pub const SS_VECTOR: usize = 12;
-pub const GP_VECTOR: usize = 13;
-pub const PF_VECTOR: usize = 14;
-pub const MF_VECTOR: usize = 16;
-pub const AC_VECTOR: usize = 17;
-pub const MCE_VECTOR: usize = 18;
-pub const XF_VECTOR: usize = 19;
-pub const CP_VECTOR: usize = 21;
 pub const HV_VECTOR: usize = 28;
 pub const VC_VECTOR: usize = 29;
-pub const SX_VECTOR: usize = 30;
-
-pub const INT_INJ_VECTOR: usize = 0x50;
 
 bitflags::bitflags! {
     /// Page fault error code flags.
@@ -162,10 +139,6 @@ impl InsnMachineCtx for X86ExceptionContext {
     }
 }
 
-pub fn user_mode(ctxt: &X86ExceptionContext) -> bool {
-    (ctxt.frame.cs & 3) == 3
-}
-
 #[derive(Copy, Clone, Default, Debug)]
 #[repr(C, packed)]
 pub struct IdtEntry {
@@ -183,9 +156,7 @@ const IDT_TARGET_MASK_3_SHIFT: u64 = 32;
 
 const IDT_TYPE_MASK: u8 = 0x0f;
 const IDT_TYPE_SHIFT: u64 = 40;
-const IDT_TYPE_CALL: u8 = 0x0c;
 const IDT_TYPE_INT: u8 = 0x0e;
-const IDT_TYPE_TRAP: u8 = 0x0f;
 
 fn idt_type_mask(t: u8) -> u64 {
     ((t & IDT_TYPE_MASK) as u64) << IDT_TYPE_SHIFT
@@ -223,31 +194,6 @@ impl IdtEntry {
 
     pub fn raw_entry(target: VirtAddr) -> Self {
         IdtEntry::create(target, SVSM_CS, IDT_TYPE_INT, 0, 0)
-    }
-
-    pub fn entry(handler: unsafe extern "C" fn()) -> Self {
-        let target = VirtAddr::from(handler as *const ());
-        IdtEntry::create(target, SVSM_CS, IDT_TYPE_INT, 0, 0)
-    }
-
-    pub fn user_entry(handler: unsafe extern "C" fn()) -> Self {
-        let target = VirtAddr::from(handler as *const ());
-        IdtEntry::create(target, SVSM_CS, IDT_TYPE_INT, 3, 0)
-    }
-
-    pub fn ist_entry(handler: unsafe extern "C" fn(), ist: u8) -> Self {
-        let target = VirtAddr::from(handler as *const ());
-        IdtEntry::create(target, SVSM_CS, IDT_TYPE_INT, 0, ist)
-    }
-
-    pub fn trap_entry(handler: unsafe extern "C" fn()) -> Self {
-        let target = VirtAddr::from(handler as *const ());
-        IdtEntry::create(target, SVSM_CS, IDT_TYPE_TRAP, 0, 0)
-    }
-
-    pub fn call_entry(handler: unsafe extern "C" fn()) -> Self {
-        let target = VirtAddr::from(handler as *const ());
-        IdtEntry::create(target, SVSM_CS, IDT_TYPE_CALL, 3, 0)
     }
 
     pub const fn no_handler() -> Self {
@@ -315,45 +261,10 @@ impl WriteLockGuard<'static, IDT> {
     }
 }
 
-impl ReadLockGuard<'static, IDT> {
-    pub fn base_limit(&self) -> (u64, u32) {
-        let base: *const IDT = core::ptr::from_ref(self);
-        let limit = (IDT_ENTRIES * mem::size_of::<IdtEntry>()) as u32;
-        (base as u64, limit)
-    }
-}
-
 static IDT: RWLock<IDT> = RWLock::new(IDT::new());
-
-pub fn idt() -> ReadLockGuard<'static, IDT> {
-    IDT.lock_read()
-}
 
 pub fn idt_mut() -> WriteLockGuard<'static, IDT> {
     IDT.lock_write()
-}
-
-pub fn triple_fault() {
-    let desc: IdtDesc = IdtDesc {
-        size: 0,
-        address: VirtAddr::from(0u64),
-    };
-
-    unsafe {
-        asm!("lidt (%rax)
-              int3", in("rax") &desc, options(att_syntax));
-    }
-}
-
-extern "C" {
-    static entry_code_start: u8;
-    static entry_code_end: u8;
-}
-
-pub fn is_exception_handler_return_site(rip: VirtAddr) -> bool {
-    let start = VirtAddr::from(&raw const entry_code_start);
-    let end = VirtAddr::from(&raw const entry_code_end);
-    (start..end).contains(&rip)
 }
 
 global_asm!(
