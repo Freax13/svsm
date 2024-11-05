@@ -65,10 +65,6 @@ impl SvsmPlatform for TdpPlatform {
         }
     }
 
-    fn cpuid(&self, eax: u32) -> Option<CpuidResult> {
-        Some(CpuidResult::get(eax, 0))
-    }
-
     fn setup_guest_host_comm(&mut self, _cpu: &PerCpu, _is_bsp: bool) {}
 
     fn get_io_port(&self) -> &'static dyn IOPort {
@@ -107,18 +103,7 @@ impl SvsmPlatform for TdpPlatform {
         Ok(())
     }
 
-    fn use_interrupts(&self) -> bool {
-        true
-    }
-
     fn eoi(&self) {}
-
-    fn is_external_interrupt(&self, _vector: usize) -> bool {
-        // Examine the APIC ISR to determine whether this interrupt vector is
-        // active.  If so, it is assumed to be an external interrupt.
-        // TODO - add code to read the APIC ISR.
-        todo!();
-    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]

@@ -105,10 +105,6 @@ impl SvsmPlatform for SnpPlatform {
         }
     }
 
-    fn cpuid(&self, eax: u32) -> Option<CpuidResult> {
-        cpuid_table(eax)
-    }
-
     fn setup_guest_host_comm(&mut self, cpu: &PerCpu, is_bsp: bool) {
         if is_bsp {
             verify_ghcb_version();
@@ -157,10 +153,6 @@ impl SvsmPlatform for SnpPlatform {
         pvalidate_range(region, PvalidateOp::from(op))
     }
 
-    fn use_interrupts(&self) -> bool {
-        self.can_use_interrupts
-    }
-
     fn eoi(&self) {
         // Issue an explicit EOI unless no explicit EOI is required.
         if !current_hv_doorbell().no_eoi_required() {
@@ -169,15 +161,6 @@ impl SvsmPlatform for SnpPlatform {
             // panic.
             let _ = current_ghcb().wrmsr(0x80B, 0);
         }
-    }
-
-    fn is_external_interrupt(&self, _vector: usize) -> bool {
-        // When restricted injection is active, the event disposition is
-        // already known to the caller and thus need not be examined.  When
-        // restricted injection is not active, the hypervisor must be trusted
-        // with all event delivery, so all events are assumed not to be
-        // external interrupts.
-        false
     }
 }
 

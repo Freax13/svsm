@@ -7,7 +7,6 @@
 use core::ops::{Deref, DerefMut};
 
 use crate::address::{PhysAddr, VirtAddr};
-use crate::cpu::cpuid::CpuidResult;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::IOPort;
@@ -71,9 +70,6 @@ pub trait SvsmPlatform {
     /// Determines the paging encryption masks for the current architecture.
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks;
 
-    /// Obtain CPUID using platform-specific tables.
-    fn cpuid(&self, eax: u32) -> Option<CpuidResult>;
-
     /// Establishes state required for guest/host communication.
     fn setup_guest_host_comm(&mut self, cpu: &PerCpu, is_bsp: bool);
 
@@ -98,15 +94,8 @@ pub trait SvsmPlatform {
         op: PageValidateOp,
     ) -> Result<(), SvsmError>;
 
-    /// Determines whether the platform supports interrupts to the SVSM.
-    fn use_interrupts(&self) -> bool;
-
     /// Perform an EOI of the current interrupt.
     fn eoi(&self);
-
-    /// Determines whether a given interrupt vector was invoked as an external
-    /// interrupt.
-    fn is_external_interrupt(&self, vector: usize) -> bool;
 }
 
 //FIXME - remove Copy trait
