@@ -4,7 +4,6 @@
 //
 // Author: Roy Hopkins <rhopkins@suse.de>
 
-mod exec;
 mod schedule;
 mod tasks;
 mod waiting;
@@ -19,5 +18,4 @@ pub use tasks::{
     TaskState, INITIAL_TASK_ID, TASK_FLAG_SHARE_PT,
 };
 
-pub use exec::exec_user;
 pub use waiting::WaitQueue;
