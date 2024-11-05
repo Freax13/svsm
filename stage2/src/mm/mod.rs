@@ -8,7 +8,6 @@ pub mod address_space;
 pub mod alloc;
 pub mod guestmem;
 pub mod mappings;
-pub mod memory;
 pub mod page_visibility;
 mod pagebox;
 pub mod pagetable;
@@ -19,7 +18,6 @@ pub mod vm;
 
 pub use address_space::*;
 pub use guestmem::GuestPtr;
-pub use memory::{valid_phys_address, writable_phys_addr};
 pub use pagebox::*;
 pub use ptguards::*;
 
