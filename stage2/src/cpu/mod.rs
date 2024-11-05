@@ -17,7 +17,6 @@ pub mod mem;
 pub mod msr;
 pub mod percpu;
 pub mod registers;
-pub mod smp;
 pub mod sse;
 pub mod tlb;
 pub mod tss;
