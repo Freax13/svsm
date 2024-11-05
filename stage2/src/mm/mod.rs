@@ -11,7 +11,6 @@ pub mod page_visibility;
 mod pagebox;
 pub mod pagetable;
 pub mod validate;
-pub mod virtualrange;
 pub mod vm;
 
 pub use address_space::*;

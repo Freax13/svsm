@@ -11,7 +11,6 @@ use crate::cpu::IrqState;
 use crate::error::SvsmError;
 use crate::locking::{LockGuard, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
-use crate::mm::virtualrange::VirtualRange;
 use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE};
 use crate::sev::ghcb::{GhcbPage, GHCB};
 use crate::sev::hv_doorbell::HVDoorbell;
@@ -129,10 +128,6 @@ pub struct PerCpu {
     irq_state: IrqState,
 
     pgtbl: RefCell<Option<&'static mut PageTable>>,
-    /// Address allocator for per-cpu 4k temporary mappings
-    pub vrange_4k: RefCell<VirtualRange>,
-    /// Address allocator for per-cpu 2m temporary mappings
-    pub vrange_2m: RefCell<VirtualRange>,
 
     /// GHCB page for this CPU.
     ghcb: OnceCell<GhcbPage>,
@@ -153,9 +148,6 @@ impl PerCpu {
         Self {
             pgtbl: RefCell::new(None),
             irq_state: IrqState::new(),
-
-            vrange_4k: RefCell::new(VirtualRange::new()),
-            vrange_2m: RefCell::new(VirtualRange::new()),
 
             shared: PerCpuShared::new(apic_id),
             ghcb: OnceCell::new(),
