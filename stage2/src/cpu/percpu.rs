@@ -6,40 +6,34 @@
 
 extern crate alloc;
 
-use super::gdt_mut;
-use super::tss::{X86Tss, IST_DF};
-use crate::address::{Address, PhysAddr, VirtAddr};
-use crate::cpu::idt::common::INT_INJ_VECTOR;
+use super::tss::X86Tss;
+use crate::address::{PhysAddr, VirtAddr};
 use crate::cpu::tss::TSS_LIMIT;
-use crate::cpu::vmsa::{init_guest_vmsa, init_svsm_vmsa};
-use crate::cpu::{IrqState, LocalApic};
-use crate::error::{ApicError, SvsmError};
+use crate::cpu::vmsa::init_svsm_vmsa;
+use crate::cpu::IrqState;
+use crate::error::SvsmError;
 use crate::locking::{LockGuard, RWLock, RWLockIrqSafe, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::virtualrange::VirtualRange;
-use crate::mm::vm::{Mapping, VMKernelStack, VMPhysMem, VMRMapping, VMReserved, VMR};
-use crate::mm::{
-    virt_to_phys, PageBox, SVSM_PERCPU_BASE, SVSM_PERCPU_CAA_BASE, SVSM_PERCPU_END,
-    SVSM_PERCPU_TEMP_BASE_2M, SVSM_PERCPU_TEMP_BASE_4K, SVSM_PERCPU_TEMP_END_2M,
-    SVSM_PERCPU_TEMP_END_4K, SVSM_PERCPU_VMSA_BASE, SVSM_STACKS_INIT_TASK, SVSM_STACK_IST_DF_BASE,
-};
-use crate::platform::{SvsmPlatform, SVSM_PLATFORM};
+use crate::mm::vm::{Mapping, VMRMapping, VMR};
+use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE, SVSM_PERCPU_END};
+use crate::platform::SVSM_PLATFORM;
 use crate::sev::ghcb::{GhcbPage, GHCB};
 use crate::sev::hv_doorbell::{allocate_hv_doorbell_page, HVDoorbell};
 use crate::sev::msr_protocol::{hypervisor_ghcb_features, GHCBHvFeatures};
 use crate::sev::utils::RMPFlags;
 use crate::sev::vmsa::{VMSAControl, VmsaPage};
-use crate::task::{schedule, schedule_task, RunQueue, Task, TaskPointer, WaitQueue};
-use crate::types::{PAGE_SHIFT, PAGE_SHIFT_2M, PAGE_SIZE, PAGE_SIZE_2M, SVSM_TR_FLAGS, SVSM_TSS};
+use crate::task::{RunQueue, TaskPointer};
+use crate::types::{PAGE_SIZE, SVSM_TR_FLAGS, SVSM_TSS};
 use crate::utils::MemoryRegion;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::cell::{Cell, OnceCell, Ref, RefCell, RefMut, UnsafeCell};
+use core::cell::{Cell, OnceCell, RefCell, RefMut, UnsafeCell};
 use core::mem::size_of;
 use core::ptr;
 use core::slice::Iter;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use cpuarch::vmsa::{VMSASegment, VMSA};
+use cpuarch::vmsa::VMSASegment;
 
 #[derive(Copy, Clone, Debug)]
 pub struct PerCpuInfo {
@@ -120,66 +114,16 @@ impl IstStacks {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GuestVmsaRef {
-    vmsa: Option<PhysAddr>,
     caa: Option<PhysAddr>,
-    generation: u64,
-    gen_in_use: u64,
 }
 
 impl GuestVmsaRef {
     pub const fn new() -> Self {
-        GuestVmsaRef {
-            vmsa: None,
-            caa: None,
-            generation: 1,
-            gen_in_use: 0,
-        }
-    }
-
-    pub fn needs_update(&self) -> bool {
-        self.generation != self.gen_in_use
-    }
-
-    pub fn update_vmsa(&mut self, paddr: Option<PhysAddr>) {
-        self.vmsa = paddr;
-        self.generation += 1;
-    }
-
-    pub fn update_caa(&mut self, paddr: Option<PhysAddr>) {
-        self.caa = paddr;
-        self.generation += 1;
-    }
-
-    pub fn update_vmsa_caa(&mut self, vmsa: Option<PhysAddr>, caa: Option<PhysAddr>) {
-        self.vmsa = vmsa;
-        self.caa = caa;
-        self.generation += 1;
-    }
-
-    pub fn set_updated(&mut self) {
-        self.gen_in_use = self.generation;
-    }
-
-    pub fn vmsa_phys(&self) -> Option<PhysAddr> {
-        self.vmsa
+        GuestVmsaRef { caa: None }
     }
 
     pub fn caa_phys(&self) -> Option<PhysAddr> {
         self.caa
-    }
-
-    pub fn vmsa(&mut self) -> &mut VMSA {
-        assert!(self.vmsa.is_some());
-        // SAFETY: this function takes &mut self, so only one mutable
-        // reference to the underlying VMSA can exist.
-        unsafe { SVSM_PERCPU_VMSA_BASE.as_mut_ptr::<VMSA>().as_mut().unwrap() }
-    }
-
-    pub fn caa_addr(&self) -> Option<VirtAddr> {
-        let caa_phys = self.caa_phys()?;
-        let offset = caa_phys.page_offset();
-
-        Some(SVSM_PERCPU_CAA_BASE + offset)
     }
 }
 
@@ -187,7 +131,6 @@ impl GuestVmsaRef {
 pub struct PerCpuShared {
     apic_id: u32,
     guest_vmsa: SpinLock<GuestVmsaRef>,
-    online: AtomicBool,
     ipi_irr: [AtomicU32; 8],
     ipi_pending: AtomicBool,
     nmi_pending: AtomicBool,
@@ -198,7 +141,6 @@ impl PerCpuShared {
         PerCpuShared {
             apic_id,
             guest_vmsa: SpinLock::new(GuestVmsaRef::new()),
-            online: AtomicBool::new(false),
             ipi_irr: core::array::from_fn(|_| AtomicU32::new(0)),
             ipi_pending: AtomicBool::new(false),
             nmi_pending: AtomicBool::new(false),
@@ -207,41 +149,6 @@ impl PerCpuShared {
 
     pub const fn apic_id(&self) -> u32 {
         self.apic_id
-    }
-
-    pub fn update_guest_vmsa_caa(&self, vmsa: PhysAddr, caa: PhysAddr) {
-        let mut locked = self.guest_vmsa.lock();
-        locked.update_vmsa_caa(Some(vmsa), Some(caa));
-    }
-
-    pub fn update_guest_vmsa(&self, vmsa: PhysAddr) {
-        let mut locked = self.guest_vmsa.lock();
-        locked.update_vmsa(Some(vmsa));
-    }
-
-    pub fn update_guest_caa(&self, caa: PhysAddr) {
-        let mut locked = self.guest_vmsa.lock();
-        locked.update_caa(Some(caa));
-    }
-
-    pub fn clear_guest_vmsa_if_match(&self, paddr: PhysAddr) {
-        let mut locked = self.guest_vmsa.lock();
-        if locked.vmsa.is_none() {
-            return;
-        }
-
-        let vmsa_phys = locked.vmsa_phys();
-        if vmsa_phys.unwrap() == paddr {
-            locked.update_vmsa(None);
-        }
-    }
-
-    pub fn set_online(&self) {
-        self.online.store(true, Ordering::Release);
-    }
-
-    pub fn is_online(&self) -> bool {
-        self.online.load(Ordering::Acquire)
     }
 
     pub fn request_ipi(&self, vector: u8) {
@@ -290,7 +197,6 @@ pub struct PerCpu {
     pgtbl: RefCell<Option<&'static mut PageTable>>,
     tss: Cell<X86Tss>,
     svsm_vmsa: OnceCell<VmsaPage>,
-    reset_ip: Cell<u64>,
     /// PerCpu Virtual Memory Range
     vm_range: VMR,
     /// Address allocator for per-cpu 4k temporary mappings
@@ -299,10 +205,6 @@ pub struct PerCpu {
     pub vrange_2m: RefCell<VirtualRange>,
     /// Task list that has been assigned for scheduling on this CPU
     runqueue: RWLockIrqSafe<RunQueue>,
-    /// WaitQueue for request processing
-    request_waitqueue: RefCell<WaitQueue>,
-    /// Local APIC state for APIC emulation if enabled
-    apic: RefCell<Option<LocalApic>>,
 
     /// GHCB page for this CPU.
     ghcb: OnceCell<GhcbPage>,
@@ -325,7 +227,6 @@ impl PerCpu {
             irq_state: IrqState::new(),
             tss: Cell::new(X86Tss::new()),
             svsm_vmsa: OnceCell::new(),
-            reset_ip: Cell::new(0xffff_fff0),
             vm_range: {
                 let mut vmr = VMR::new(SVSM_PERCPU_BASE, SVSM_PERCPU_END, PTEntryFlags::GLOBAL);
                 vmr.set_per_cpu(true);
@@ -335,8 +236,6 @@ impl PerCpu {
             vrange_4k: RefCell::new(VirtualRange::new()),
             vrange_2m: RefCell::new(VirtualRange::new()),
             runqueue: RWLockIrqSafe::new(RunQueue::new()),
-            request_waitqueue: RefCell::new(WaitQueue::new()),
-            apic: RefCell::new(None),
 
             shared: PerCpuShared::new(apic_id),
             ghcb: OnceCell::new(),
@@ -433,37 +332,8 @@ impl PerCpu {
         self.shared().apic_id()
     }
 
-    pub fn init_page_table(&self, pgtable: PageBox<PageTable>) -> Result<(), SvsmError> {
-        self.vm_range.initialize()?;
-        self.set_pgtable(PageBox::leak(pgtable));
-
-        Ok(())
-    }
-
     pub fn set_pgtable(&self, pgtable: &'static mut PageTable) {
         *self.pgtbl.borrow_mut() = Some(pgtable);
-    }
-
-    fn allocate_stack(&self, base: VirtAddr) -> Result<VirtAddr, SvsmError> {
-        let stack = VMKernelStack::new()?;
-        let top_of_stack = stack.top_of_stack(base);
-        let mapping = Arc::new(Mapping::new(stack));
-
-        self.vm_range.insert_at(base, mapping)?;
-
-        Ok(top_of_stack)
-    }
-
-    fn allocate_init_stack(&self) -> Result<(), SvsmError> {
-        let init_stack = Some(self.allocate_stack(SVSM_STACKS_INIT_TASK)?);
-        self.init_stack.set(init_stack);
-        Ok(())
-    }
-
-    fn allocate_ist_stacks(&self) -> Result<(), SvsmError> {
-        let double_fault_stack = self.allocate_stack(SVSM_STACK_IST_DF_BASE)?;
-        self.ist.double_fault_stack.set(Some(double_fault_stack));
-        Ok(())
     }
 
     pub fn get_pgtable(&self) -> RefMut<'_, PageTable> {
@@ -507,117 +377,11 @@ impl PerCpu {
         Ok(())
     }
 
-    fn setup_tss(&self) {
-        let double_fault_stack = self.get_top_of_df_stack();
-        let mut tss = self.tss.get();
-        tss.set_ist_stack(IST_DF, double_fault_stack);
-        self.tss.set(tss);
-    }
-
     pub fn map_self_stage2(&self) -> Result<(), SvsmError> {
         let vaddr = VirtAddr::from(ptr::from_ref(self));
         let paddr = virt_to_phys(vaddr);
         let flags = PTEntryFlags::data();
         self.get_pgtable().map_4k(SVSM_PERCPU_BASE, paddr, flags)
-    }
-
-    pub fn map_self(&self) -> Result<(), SvsmError> {
-        let vaddr = VirtAddr::from(ptr::from_ref(self));
-        let paddr = virt_to_phys(vaddr);
-        let self_mapping = Arc::new(VMPhysMem::new_mapping(paddr, PAGE_SIZE, true));
-        self.vm_range.insert_at(SVSM_PERCPU_BASE, self_mapping)?;
-        Ok(())
-    }
-
-    fn initialize_vm_ranges(&self) -> Result<(), SvsmError> {
-        let size_4k = SVSM_PERCPU_TEMP_END_4K - SVSM_PERCPU_TEMP_BASE_4K;
-        let temp_mapping_4k = Arc::new(VMReserved::new_mapping(size_4k));
-        self.vm_range
-            .insert_at(SVSM_PERCPU_TEMP_BASE_4K, temp_mapping_4k)?;
-
-        let size_2m = SVSM_PERCPU_TEMP_END_2M - SVSM_PERCPU_TEMP_BASE_2M;
-        let temp_mapping_2m = Arc::new(VMReserved::new_mapping(size_2m));
-        self.vm_range
-            .insert_at(SVSM_PERCPU_TEMP_BASE_2M, temp_mapping_2m)?;
-
-        Ok(())
-    }
-
-    fn finish_page_table(&self) {
-        let mut pgtable = self.get_pgtable();
-        self.vm_range.populate(&mut pgtable);
-    }
-
-    pub fn dump_vm_ranges(&self) {
-        self.vm_range.dump_ranges();
-    }
-
-    pub fn setup(
-        &self,
-        platform: &dyn SvsmPlatform,
-        pgtable: PageBox<PageTable>,
-    ) -> Result<(), SvsmError> {
-        self.init_page_table(pgtable)?;
-
-        // Map PerCpu data in own page-table
-        self.map_self()?;
-
-        // Reserve ranges for temporary mappings
-        self.initialize_vm_ranges()?;
-
-        // Allocate per-cpu init stack
-        self.allocate_init_stack()?;
-
-        // Allocate IST stacks
-        self.allocate_ist_stacks()?;
-
-        // Setup TSS
-        self.setup_tss();
-
-        // Initialize allocator for temporary mappings
-        self.virt_range_init();
-
-        self.finish_page_table();
-
-        // Complete platform-specific initialization.
-        platform.setup_percpu(self)?;
-
-        Ok(())
-    }
-
-    // Setup code which needs to run on the target CPU
-    pub fn setup_on_cpu(&self, platform: &dyn SvsmPlatform) -> Result<(), SvsmError> {
-        platform.setup_percpu_current(self)
-    }
-
-    pub fn setup_idle_task(&self, entry: extern "C" fn()) -> Result<(), SvsmError> {
-        let idle_task = Task::create(self, entry)?;
-        self.runqueue.lock_read().set_idle_task(idle_task);
-        Ok(())
-    }
-
-    pub fn load_pgtable(&self) {
-        self.get_pgtable().load();
-    }
-
-    pub fn load_tss(&self) {
-        // SAFETY: this can only produce UB if someone else calls self.tss.set
-        // () while this new reference is alive, which cannot happen as this
-        // data is local to this CPU. We need to get a reference to the value
-        // inside the Cell because the address of the TSS will be used. If we
-        // did self.tss.get(), then the address of a temporary copy would be
-        // used.
-        let tss = unsafe { &*self.tss.as_ptr() };
-        gdt_mut().load_tss(tss);
-    }
-
-    pub fn load(&self) {
-        self.load_pgtable();
-        self.load_tss();
-    }
-
-    pub fn set_reset_ip(&self, reset_ip: u64) {
-        self.reset_ip.set(reset_ip);
     }
 
     /// Allocates and initializes a new VMSA for this CPU. Returns its
@@ -648,126 +412,8 @@ impl PerCpu {
         Ok((paddr, sev_features))
     }
 
-    pub fn unmap_guest_vmsa(&self) {
-        assert!(self.shared().apic_id == this_cpu().get_apic_id());
-        // Ignore errors - the mapping might or might not be there
-        let _ = self.vm_range.remove(SVSM_PERCPU_VMSA_BASE);
-    }
-
-    pub fn map_guest_vmsa(&self, paddr: PhysAddr) -> Result<(), SvsmError> {
-        assert!(self.shared().apic_id == this_cpu().get_apic_id());
-        let vmsa_mapping = Arc::new(VMPhysMem::new_mapping(paddr, PAGE_SIZE, true));
-        self.vm_range
-            .insert_at(SVSM_PERCPU_VMSA_BASE, vmsa_mapping)?;
-
-        Ok(())
-    }
-
     pub fn guest_vmsa_ref(&self) -> LockGuard<'_, GuestVmsaRef> {
         self.shared().guest_vmsa.lock()
-    }
-
-    pub fn alloc_guest_vmsa(&self) -> Result<(), SvsmError> {
-        // Enable alternate injection if the hypervisor supports it.
-        let use_alternate_injection = SVSM_PLATFORM.query_apic_registration_state();
-        if use_alternate_injection {
-            self.apic.replace(Some(LocalApic::new()));
-
-            // Configure the interrupt injection vector.
-            let ghcb = self.ghcb().unwrap();
-            ghcb.configure_interrupt_injection(INT_INJ_VECTOR)?;
-        }
-
-        let mut vmsa = VmsaPage::new(RMPFlags::GUEST_VMPL)?;
-        let paddr = vmsa.paddr();
-
-        init_guest_vmsa(&mut vmsa, self.reset_ip.get(), use_alternate_injection);
-
-        self.shared().update_guest_vmsa(paddr);
-        let _ = VmsaPage::leak(vmsa);
-
-        Ok(())
-    }
-
-    /// Returns a shared reference to the local APIC, or `None` if APIC
-    /// emulation is not enabled.
-    fn apic(&self) -> Option<Ref<'_, LocalApic>> {
-        let apic = self.apic.borrow();
-        Ref::filter_map(apic, Option::as_ref).ok()
-    }
-
-    /// Returns a mutable reference to the local APIC, or `None` if APIC
-    /// emulation is not enabled.
-    fn apic_mut(&self) -> Option<RefMut<'_, LocalApic>> {
-        let apic = self.apic.borrow_mut();
-        RefMut::filter_map(apic, Option::as_mut).ok()
-    }
-
-    pub fn unmap_caa(&self) {
-        // Ignore errors - the mapping might or might not be there
-        let _ = self.vm_range.remove(SVSM_PERCPU_CAA_BASE);
-    }
-
-    pub fn map_guest_caa(&self, paddr: PhysAddr) -> Result<(), SvsmError> {
-        self.unmap_caa();
-
-        let caa_mapping = Arc::new(VMPhysMem::new_mapping(paddr, PAGE_SIZE, true));
-        self.vm_range.insert_at(SVSM_PERCPU_CAA_BASE, caa_mapping)?;
-
-        Ok(())
-    }
-
-    pub fn disable_apic_emulation(&self) {
-        if let Some(mut apic) = self.apic_mut() {
-            let mut vmsa_ref = self.guest_vmsa_ref();
-            let caa_addr = vmsa_ref.caa_addr();
-            let vmsa = vmsa_ref.vmsa();
-            apic.disable_apic_emulation(vmsa, caa_addr);
-        }
-    }
-
-    pub fn clear_pending_interrupts(&self) {
-        if let Some(mut apic) = self.apic_mut() {
-            let mut vmsa_ref = self.guest_vmsa_ref();
-            let caa_addr = vmsa_ref.caa_addr();
-            let vmsa = vmsa_ref.vmsa();
-            apic.check_delivered_interrupts(vmsa, caa_addr);
-        }
-    }
-
-    pub fn update_apic_emulation(&self, vmsa: &mut VMSA, caa_addr: Option<VirtAddr>) {
-        if let Some(mut apic) = self.apic_mut() {
-            apic.present_interrupts(self.shared(), vmsa, caa_addr);
-        }
-    }
-
-    pub fn use_apic_emulation(&self) -> bool {
-        self.apic().is_some()
-    }
-
-    pub fn read_apic_register(&self, register: u64) -> Result<u64, SvsmError> {
-        let mut vmsa_ref = self.guest_vmsa_ref();
-        let caa_addr = vmsa_ref.caa_addr();
-        let vmsa = vmsa_ref.vmsa();
-        self.apic_mut()
-            .ok_or(SvsmError::Apic(ApicError::Disabled))?
-            .read_register(self.shared(), vmsa, caa_addr, register)
-    }
-
-    pub fn write_apic_register(&self, register: u64, value: u64) -> Result<(), SvsmError> {
-        let mut vmsa_ref = self.guest_vmsa_ref();
-        let caa_addr = vmsa_ref.caa_addr();
-        let vmsa = vmsa_ref.vmsa();
-        self.apic_mut()
-            .ok_or(SvsmError::Apic(ApicError::Disabled))?
-            .write_register(vmsa, caa_addr, register, value)
-    }
-
-    pub fn configure_apic_vector(&self, vector: u8, allowed: bool) -> Result<(), SvsmError> {
-        self.apic_mut()
-            .ok_or(SvsmError::Apic(ApicError::Disabled))?
-            .configure_vector(vector, allowed);
-        Ok(())
     }
 
     fn vmsa_tr_segment(&self) -> VMSASegment {
@@ -777,22 +423,6 @@ impl PerCpu {
             limit: TSS_LIMIT as u32,
             base: &raw const self.tss as u64,
         }
-    }
-
-    fn virt_range_init(&self) {
-        // Initialize 4k range
-        let page_count = (SVSM_PERCPU_TEMP_END_4K - SVSM_PERCPU_TEMP_BASE_4K) / PAGE_SIZE;
-        assert!(page_count <= VirtualRange::CAPACITY);
-        self.vrange_4k
-            .borrow_mut()
-            .init(SVSM_PERCPU_TEMP_BASE_4K, page_count, PAGE_SHIFT);
-
-        // Initialize 2M range
-        let page_count = (SVSM_PERCPU_TEMP_END_2M - SVSM_PERCPU_TEMP_BASE_2M) / PAGE_SIZE_2M;
-        assert!(page_count <= VirtualRange::CAPACITY);
-        self.vrange_2m
-            .borrow_mut()
-            .init(SVSM_PERCPU_TEMP_BASE_2M, page_count, PAGE_SHIFT_2M);
     }
 
     /// Create a new virtual memory mapping in the PerCpu VMR
@@ -868,10 +498,6 @@ pub fn this_cpu() -> &'static PerCpu {
     unsafe { &*SVSM_PERCPU_BASE.as_ptr::<PerCpu>() }
 }
 
-pub fn this_cpu_shared() -> &'static PerCpuShared {
-    this_cpu().shared()
-}
-
 /// Disables IRQs on the current CPU. Keeps track of the nesting level and
 /// the original IRQ state.
 ///
@@ -923,17 +549,6 @@ pub struct VmsaRegistryEntry {
     pub in_use: bool,
 }
 
-impl VmsaRegistryEntry {
-    pub const fn new(paddr: PhysAddr, apic_id: u32, guest_owned: bool) -> Self {
-        VmsaRegistryEntry {
-            paddr,
-            apic_id,
-            guest_owned,
-            in_use: false,
-        }
-    }
-}
-
 // PERCPU VMSAs to apic_id map
 pub static PERCPU_VMSAS: PerCpuVmsas = PerCpuVmsas::new();
 
@@ -954,71 +569,6 @@ impl PerCpuVmsas {
             .lock_read()
             .iter()
             .any(|vmsa| vmsa.paddr == paddr)
-    }
-
-    pub fn register(
-        &self,
-        paddr: PhysAddr,
-        apic_id: u32,
-        guest_owned: bool,
-    ) -> Result<(), SvsmError> {
-        let mut guard = self.vmsas.lock_write();
-        if guard.iter().any(|vmsa| vmsa.paddr == paddr) {
-            return Err(SvsmError::InvalidAddress);
-        }
-
-        guard.push(VmsaRegistryEntry::new(paddr, apic_id, guest_owned));
-        Ok(())
-    }
-
-    pub fn set_used(&self, paddr: PhysAddr) -> Option<u32> {
-        self.vmsas
-            .lock_write()
-            .iter_mut()
-            .find(|vmsa| vmsa.paddr == paddr && !vmsa.in_use)
-            .map(|vmsa| {
-                vmsa.in_use = true;
-                vmsa.apic_id
-            })
-    }
-
-    pub fn unregister(&self, paddr: PhysAddr, in_use: bool) -> Result<VmsaRegistryEntry, u64> {
-        let mut guard = self.vmsas.lock_write();
-        let index = guard
-            .iter()
-            .position(|vmsa| vmsa.paddr == paddr && vmsa.in_use == in_use)
-            .ok_or(0u64)?;
-
-        if in_use {
-            let vmsa = &guard[index];
-
-            if vmsa.apic_id == 0 {
-                return Err(0);
-            }
-
-            let target_cpu = PERCPU_AREAS
-                .get(vmsa.apic_id)
-                .expect("Invalid APIC-ID in VMSA registry");
-            target_cpu.clear_guest_vmsa_if_match(paddr);
-        }
-
-        Ok(guard.swap_remove(index))
-    }
-}
-
-pub fn wait_for_requests() {
-    let current_task = current_task();
-    this_cpu()
-        .request_waitqueue
-        .borrow_mut()
-        .wait_for_event(current_task);
-    schedule();
-}
-
-pub fn process_requests() {
-    let maybe_task = this_cpu().request_waitqueue.borrow_mut().wakeup();
-    if let Some(task) = maybe_task {
-        schedule_task(task);
     }
 }
 
