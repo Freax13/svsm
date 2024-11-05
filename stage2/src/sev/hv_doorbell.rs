@@ -3,10 +3,6 @@
 
 use crate::cpu::idt::svsm::common_isr_handler;
 use crate::cpu::percpu::this_cpu;
-use crate::error::SvsmError;
-use crate::mm::page_visibility::SharedBox;
-use crate::mm::virt_to_phys;
-use crate::sev::ghcb::GHCB;
 
 use bitfield_struct::bitfield;
 use core::cell::UnsafeCell;
@@ -44,26 +40,6 @@ pub struct HVExtIntInfo {
     pub status: AtomicU32,
     pub irr: [AtomicU32; 7],
     pub isr: [AtomicU32; 8],
-}
-
-/// Allocates a new HV doorbell page and registers it on the hypervisor
-/// using the given GHCB.
-pub fn allocate_hv_doorbell_page(ghcb: &GHCB) -> Result<&'static HVDoorbell, SvsmError> {
-    let page = SharedBox::<HVDoorbell>::try_new_zeroed()?;
-
-    let vaddr = page.addr();
-    let paddr = virt_to_phys(vaddr);
-    ghcb.register_hv_doorbell(paddr)?;
-
-    // Create a static shared reference.
-    let ptr = page.leak();
-    let doorbell = unsafe {
-        // SAFETY: Any bit-pattern is valid for `HVDoorbell` and it tolerates
-        // unsynchronized writes from the host.
-        ptr.as_ref()
-    };
-
-    Ok(doorbell)
 }
 
 #[repr(C)]

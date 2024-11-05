@@ -14,16 +14,13 @@ use crate::mm::validate::{
 };
 use crate::mm::virt_to_phys;
 use crate::platform::PageStateChangeOp;
-use crate::sev::hv_doorbell::HVDoorbell;
 use crate::sev::utils::raw_vmgexit;
-use crate::types::{Bytes, PageSize, GUEST_VMPL, PAGE_SIZE_2M};
+use crate::types::{Bytes, PageSize, PAGE_SIZE_2M};
 use crate::utils::MemoryRegion;
 
 use crate::mm::PageBox;
-use core::arch::global_asm;
 use core::mem::{self, offset_of};
 use core::ops::Deref;
-use core::ptr;
 use core::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering};
 
 use super::msr_protocol::{invalidate_page_msr, register_ghcb_gpa_msr, validate_page_msr};
@@ -537,132 +534,6 @@ impl GHCB {
         Ok(())
     }
 
-    pub fn ap_create(
-        &self,
-        vmsa_gpa: PhysAddr,
-        apic_id: u64,
-        vmpl: u64,
-        sev_features: u64,
-    ) -> Result<(), SvsmError> {
-        self.clear();
-        let exit_info_1: u64 = 1 | (vmpl & 0xf) << 16 | apic_id << 32;
-        let exit_info_2: u64 = vmsa_gpa.into();
-        self.set_rax_valid(sev_features);
-        self.vmgexit(GHCBExitCode::AP_CREATE, exit_info_1, exit_info_2)?;
-        Ok(())
-    }
-
-    pub fn register_guest_vmsa(
-        &self,
-        vmsa_gpa: PhysAddr,
-        apic_id: u64,
-        vmpl: u64,
-        sev_features: u64,
-    ) -> Result<(), SvsmError> {
-        self.clear();
-        let exit_info_1: u64 = (vmpl & 0xf) << 16 | apic_id << 32;
-        let exit_info_2: u64 = vmsa_gpa.into();
-        self.set_rax_valid(sev_features);
-        self.vmgexit(GHCBExitCode::AP_CREATE, exit_info_1, exit_info_2)?;
-        Ok(())
-    }
-
-    pub fn register_hv_doorbell(&self, paddr: PhysAddr) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::HV_DOORBELL, 1, u64::from(paddr))?;
-        Ok(())
-    }
-
-    pub fn guest_request(&self, req_page: VirtAddr, resp_page: VirtAddr) -> Result<(), SvsmError> {
-        self.clear();
-
-        let info1: u64 = u64::from(virt_to_phys(req_page));
-        let info2: u64 = u64::from(virt_to_phys(resp_page));
-
-        self.vmgexit(GHCBExitCode::GUEST_REQUEST, info1, info2)?;
-
-        let sw_exit_info_2 = self.get_exit_info_2_valid()?;
-        if sw_exit_info_2 != 0 {
-            return Err(GhcbError::VmgexitError(
-                self.sw_exit_info_1.load(Ordering::Relaxed),
-                sw_exit_info_2,
-            )
-            .into());
-        }
-
-        Ok(())
-    }
-
-    pub fn guest_ext_request(
-        &self,
-        req_page: VirtAddr,
-        resp_page: VirtAddr,
-        data_pages: VirtAddr,
-        data_size: u64,
-    ) -> Result<(), SvsmError> {
-        self.clear();
-
-        let info1: u64 = u64::from(virt_to_phys(req_page));
-        let info2: u64 = u64::from(virt_to_phys(resp_page));
-        let rax: u64 = u64::from(virt_to_phys(data_pages));
-
-        self.set_rax_valid(rax);
-        self.set_rbx_valid(data_size);
-
-        self.vmgexit(GHCBExitCode::GUEST_EXT_REQUEST, info1, info2)?;
-
-        let sw_exit_info_2 = self.get_exit_info_2_valid()?;
-
-        // On error, RBX and exit_info_2 are returned for proper error handling.
-        // For an extended request, if the buffer provided is too small, the hypervisor
-        // will return in RBX the number of contiguous pages required
-        if sw_exit_info_2 != 0 {
-            return Err(
-                GhcbError::VmgexitError(self.rbx.load(Ordering::Relaxed), sw_exit_info_2).into(),
-            );
-        }
-
-        Ok(())
-    }
-
-    pub fn hv_ipi(&self, icr: u64) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::HV_IPI, icr, 0)?;
-        Ok(())
-    }
-
-    pub fn configure_interrupt_injection(&self, vector: usize) -> Result<(), SvsmError> {
-        self.clear();
-        self.vmgexit(GHCBExitCode::CONFIGURE_INT_INJ, vector as u64, 0)?;
-        Ok(())
-    }
-
-    pub fn specific_eoi(&self, vector: u8, vmpl: u8) -> Result<(), SvsmError> {
-        self.clear();
-        let exit_info = ((vmpl as u64) << 16) | (vector as u64);
-        self.vmgexit(GHCBExitCode::SPECIFIC_EOI, exit_info, 0)?;
-        Ok(())
-    }
-
-    pub fn disable_alternate_injection(
-        &self,
-        tpr: u8,
-        in_intr_shadow: bool,
-        interrupts_enabled: bool,
-    ) -> Result<(), SvsmError> {
-        let mut exit_info = (GUEST_VMPL as u64) << 16;
-        exit_info |= (tpr as u64) << 8;
-        if in_intr_shadow {
-            exit_info |= 2;
-        }
-        if interrupts_enabled {
-            exit_info |= 1;
-        }
-        self.clear();
-        self.vmgexit(GHCBExitCode::DISABLE_ALT_INJ, exit_info, 0)?;
-        Ok(())
-    }
-
     #[inline]
     #[cfg(test)]
     pub fn fill(&self, val: u8) {
@@ -676,77 +547,6 @@ impl GHCB {
         }
     }
 }
-
-extern "C" {
-    pub fn switch_to_vmpl_unsafe(hv_doorbell: *const HVDoorbell, vmpl: u32) -> bool;
-}
-
-pub fn switch_to_vmpl(vmpl: u32) {
-    // The switch to a lower VMPL must be done with an assembly sequence in
-    // order to ensure that any #HV that occurs during the sequence will
-    // correctly block the VMPL switch so that events can be processed.
-    let hv_doorbell = this_cpu().hv_doorbell();
-    let ptr = match hv_doorbell {
-        Some(doorbell) => ptr::from_ref(doorbell),
-        None => ptr::null(),
-    };
-    unsafe {
-        if !switch_to_vmpl_unsafe(ptr, vmpl) {
-            panic!("Failed to switch to VMPL {}", vmpl);
-        }
-    }
-}
-
-global_asm!(
-    r#"
-        .globl switch_to_vmpl_unsafe
-    switch_to_vmpl_unsafe:
-
-        /* Upon entry,
-         * rdi = pointer to the HV doorbell page
-         * esi = target VMPL
-         */
-        /* Check if NoFurtherSignal is set (bit 15 of the first word of the
-         * #HV doorbell page).  If so, abort the transition. */
-        test %rdi, %rdi
-        jz switch_vmpl_proceed
-        testw $0x8000, (%rdi)
-
-        /* From this point until the vmgexit, if a #HV arrives, the #HV handler
-         * must prevent the VMPL transition. */
-        .globl switch_vmpl_window_start
-    switch_vmpl_window_start:
-        jnz switch_vmpl_cancel
-
-    switch_vmpl_proceed:
-        /* Use the MSR-based VMPL switch request to avoid any need to use the
-         * GHCB page.  Run VMPL request is 0x16 and response is 0x17. */
-        movl $0x16, %eax
-        movl %esi, %edx
-        movl ${SEV_GHCB}, %ecx
-        wrmsr
-        rep; vmmcall
-
-        .globl switch_vmpl_window_end
-    switch_vmpl_window_end:
-        /* Verify that the request was honored.  ECX still contains the MSR
-         * number. */
-        rdmsr
-        andl $0xFFF, %eax
-        cmpl $0x17, %eax
-        jz switch_vmpl_cancel
-        xorl %eax, %eax
-        ret
-
-        /* An aborted VMPL switch is treated as a successful switch. */
-        .globl switch_vmpl_cancel
-    switch_vmpl_cancel:
-        movl $1, %eax
-        ret
-        "#,
-    SEV_GHCB = const SEV_GHCB,
-    options(att_syntax)
-);
 
 #[cfg(test)]
 mod tests {
