@@ -23,7 +23,6 @@ mod locking;
 mod mm;
 mod platform;
 mod protocols;
-mod requests;
 mod serial;
 mod sev;
 mod string;
