@@ -7,7 +7,6 @@
 #![no_std]
 #![no_main]
 
-mod acpi;
 mod address;
 mod boot_stage2;
 mod config;
