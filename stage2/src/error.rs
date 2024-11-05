@@ -100,20 +100,3 @@ impl From<ApicError> for SvsmError {
         Self::Apic(err)
     }
 }
-
-impl From<SvsmError> for SysCallError {
-    fn from(err: SvsmError) -> Self {
-        match err {
-            SvsmError::Alloc(AllocError::OutOfMemory) => SysCallError::ENOMEM,
-
-            SvsmError::NotSupported => SysCallError::ENOTSUPP,
-
-            SvsmError::Mem
-            | SvsmError::InvalidAddress
-            | SvsmError::InvalidBytes
-            | SvsmError::InvalidUtf8 => SysCallError::EINVAL,
-
-            _ => SysCallError::UNKNOWN,
-        }
-    }
-}

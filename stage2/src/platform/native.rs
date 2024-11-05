@@ -88,8 +88,4 @@ impl SvsmPlatform for NativePlatform {
         }
         Ok(())
     }
-
-    fn eoi(&self) {
-        todo!();
-    }
 }

@@ -13,7 +13,6 @@ use crate::locking::{LockGuard, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE};
 use crate::sev::ghcb::{GhcbPage, GHCB};
-use crate::sev::hv_doorbell::HVDoorbell;
 use crate::types::PAGE_SIZE;
 use alloc::vec::Vec;
 use core::cell::{Cell, OnceCell, RefCell, RefMut, UnsafeCell};
@@ -113,9 +112,6 @@ pub struct PerCpu {
 
     /// GHCB page for this CPU.
     ghcb: OnceCell<GhcbPage>,
-
-    /// `#HV` doorbell page for this CPU.
-    hv_doorbell: Cell<Option<&'static HVDoorbell>>,
 }
 
 impl PerCpu {
@@ -127,7 +123,6 @@ impl PerCpu {
 
             shared: PerCpuShared::new(apic_id),
             ghcb: OnceCell::new(),
-            hv_doorbell: Cell::new(None),
         }
     }
 
@@ -179,10 +174,6 @@ impl PerCpu {
 
     fn ghcb(&self) -> Option<&GhcbPage> {
         self.ghcb.get()
-    }
-
-    pub fn hv_doorbell(&self) -> Option<&'static HVDoorbell> {
-        self.hv_doorbell.get()
     }
 
     pub fn set_pgtable(&self, pgtable: &'static mut PageTable) {

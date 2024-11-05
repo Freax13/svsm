@@ -93,9 +93,6 @@ pub trait SvsmPlatform {
         region: MemoryRegion<VirtAddr>,
         op: PageValidateOp,
     ) -> Result<(), SvsmError>;
-
-    /// Perform an EOI of the current interrupt.
-    fn eoi(&self);
 }
 
 //FIXME - remove Copy trait

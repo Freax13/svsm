@@ -5,7 +5,6 @@
 // Author: Joerg Roedel <jroedel@suse.de>
 
 pub mod ghcb;
-pub mod hv_doorbell;
 pub mod msr_protocol;
 pub mod status;
 pub mod vmsa;

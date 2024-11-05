@@ -102,8 +102,6 @@ impl SvsmPlatform for TdpPlatform {
         }
         Ok(())
     }
-
-    fn eoi(&self) {}
 }
 
 #[derive(Clone, Copy, Debug, Default)]

@@ -6,4 +6,3 @@
 
 pub mod common;
 pub mod stage2;
-pub mod svsm;
