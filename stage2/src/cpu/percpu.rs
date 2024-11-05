@@ -15,7 +15,6 @@ use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE};
 use crate::sev::ghcb::{GhcbPage, GHCB};
 use crate::sev::hv_doorbell::HVDoorbell;
 use crate::types::PAGE_SIZE;
-use crate::utils::MemoryRegion;
 use alloc::vec::Vec;
 use core::cell::{Cell, OnceCell, RefCell, RefMut, UnsafeCell};
 use core::mem::size_of;
@@ -64,19 +63,6 @@ impl PerCpuAreas {
     }
 }
 
-#[derive(Debug)]
-struct IstStacks {
-    double_fault_stack: Cell<Option<VirtAddr>>,
-}
-
-impl IstStacks {
-    const fn new() -> Self {
-        IstStacks {
-            double_fault_stack: Cell::new(None),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct GuestVmsaRef {
     caa: Option<PhysAddr>,
@@ -105,10 +91,6 @@ impl PerCpuShared {
             guest_vmsa: SpinLock::new(GuestVmsaRef::new()),
         }
     }
-
-    pub const fn apic_id(&self) -> u32 {
-        self.apic_id
-    }
 }
 
 const _: () = assert!(size_of::<PerCpu>() <= PAGE_SIZE);
@@ -134,12 +116,6 @@ pub struct PerCpu {
 
     /// `#HV` doorbell page for this CPU.
     hv_doorbell: Cell<Option<&'static HVDoorbell>>,
-
-    init_stack: Cell<Option<VirtAddr>>,
-    ist: IstStacks,
-
-    /// Stack boundaries of the currently running task.
-    current_stack: Cell<MemoryRegion<VirtAddr>>,
 }
 
 impl PerCpu {
@@ -152,9 +128,6 @@ impl PerCpu {
             shared: PerCpuShared::new(apic_id),
             ghcb: OnceCell::new(),
             hv_doorbell: Cell::new(None),
-            init_stack: Cell::new(None),
-            ist: IstStacks::new(),
-            current_stack: Cell::new(MemoryRegion::new(VirtAddr::null(), 0)),
         }
     }
 
@@ -210,22 +183,6 @@ impl PerCpu {
 
     pub fn hv_doorbell(&self) -> Option<&'static HVDoorbell> {
         self.hv_doorbell.get()
-    }
-
-    pub fn get_top_of_stack(&self) -> VirtAddr {
-        self.init_stack.get().unwrap()
-    }
-
-    pub fn get_top_of_df_stack(&self) -> VirtAddr {
-        self.ist.double_fault_stack.get().unwrap()
-    }
-
-    pub fn get_current_stack(&self) -> MemoryRegion<VirtAddr> {
-        self.current_stack.get()
-    }
-
-    pub fn get_apic_id(&self) -> u32 {
-        self.shared().apic_id()
     }
 
     pub fn set_pgtable(&self, pgtable: &'static mut PageTable) {
