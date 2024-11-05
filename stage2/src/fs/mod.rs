@@ -6,9 +6,7 @@
 
 mod api;
 mod filesystem;
-mod init;
 mod ramfs;
 
 pub use api::*;
 pub use filesystem::*;
-pub use init::populate_ram_fs;
