@@ -7,7 +7,6 @@
 pub mod address_space;
 pub mod alloc;
 pub mod guestmem;
-pub mod mappings;
 pub mod page_visibility;
 mod pagebox;
 pub mod pagetable;
@@ -24,5 +23,3 @@ pub use ptguards::*;
 pub use pagetable::PageTablePart;
 
 pub use alloc::{allocate_file_page, PageRef};
-
-pub use mappings::{mmap_kernel, mmap_user, munmap_kernel, munmap_user, VMMappingGuard};

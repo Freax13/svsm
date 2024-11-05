@@ -26,7 +26,6 @@ use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::vm::{Mapping, VMFileMappingFlags, VMKernelStack, VMR};
 use crate::mm::PageBox;
 use crate::mm::{
-    mappings::create_anon_mapping, mappings::create_file_mapping, VMMappingGuard,
     SVSM_PERTASK_BASE, SVSM_PERTASK_END, SVSM_PERTASK_STACK_BASE, USER_MEM_END, USER_MEM_START,
 };
 use crate::syscall::{Obj, ObjError, ObjHandle};
@@ -435,81 +434,6 @@ impl Task {
             panic!("Error while allocating xsave area");
         }
         xsa.unwrap()
-    }
-
-    pub fn mmap_common(
-        vmr: &VMR,
-        addr: VirtAddr,
-        file: Option<&FileHandle>,
-        offset: usize,
-        size: usize,
-        flags: VMFileMappingFlags,
-    ) -> Result<VirtAddr, SvsmError> {
-        let mapping = if let Some(f) = file {
-            create_file_mapping(f, offset, size, flags)?
-        } else {
-            create_anon_mapping(size, flags)?
-        };
-
-        if flags.contains(VMFileMappingFlags::Fixed) {
-            Ok(vmr.insert_at(addr, mapping)?)
-        } else {
-            Ok(vmr.insert_hint(addr, mapping)?)
-        }
-    }
-
-    pub fn mmap_kernel(
-        &self,
-        addr: VirtAddr,
-        file: Option<&FileHandle>,
-        offset: usize,
-        size: usize,
-        flags: VMFileMappingFlags,
-    ) -> Result<VirtAddr, SvsmError> {
-        Self::mmap_common(&self.vm_kernel_range, addr, file, offset, size, flags)
-    }
-
-    pub fn mmap_kernel_guard<'a>(
-        &'a self,
-        addr: VirtAddr,
-        file: Option<&FileHandle>,
-        offset: usize,
-        size: usize,
-        flags: VMFileMappingFlags,
-    ) -> Result<VMMappingGuard<'a>, SvsmError> {
-        let vaddr = Self::mmap_common(&self.vm_kernel_range, addr, file, offset, size, flags)?;
-        Ok(VMMappingGuard::new(&self.vm_kernel_range, vaddr))
-    }
-
-    pub fn mmap_user(
-        &self,
-        addr: VirtAddr,
-        file: Option<&FileHandle>,
-        offset: usize,
-        size: usize,
-        flags: VMFileMappingFlags,
-    ) -> Result<VirtAddr, SvsmError> {
-        if self.vm_user_range.is_none() {
-            return Err(SvsmError::Mem);
-        }
-
-        let vmr = self.vm_user_range.as_ref().unwrap();
-
-        Self::mmap_common(vmr, addr, file, offset, size, flags)
-    }
-
-    pub fn munmap_kernel(&self, addr: VirtAddr) -> Result<(), SvsmError> {
-        self.vm_kernel_range.remove(addr)?;
-        Ok(())
-    }
-
-    pub fn munmap_user(&self, addr: VirtAddr) -> Result<(), SvsmError> {
-        if self.vm_user_range.is_none() {
-            return Err(SvsmError::Mem);
-        }
-
-        self.vm_user_range.as_ref().unwrap().remove(addr)?;
-        Ok(())
     }
 
     /// Adds an object to the current task.
