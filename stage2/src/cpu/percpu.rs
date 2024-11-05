@@ -10,14 +10,13 @@ use super::tss::X86Tss;
 use crate::address::{PhysAddr, VirtAddr};
 use crate::cpu::IrqState;
 use crate::error::SvsmError;
-use crate::locking::{LockGuard, RWLock, RWLockIrqSafe, SpinLock};
+use crate::locking::{LockGuard, RWLock, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::virtualrange::VirtualRange;
 use crate::mm::vm::{Mapping, VMRMapping, VMR};
 use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE, SVSM_PERCPU_END};
 use crate::sev::ghcb::{GhcbPage, GHCB};
 use crate::sev::hv_doorbell::HVDoorbell;
-use crate::task::{RunQueue, TaskPointer};
 use crate::types::PAGE_SIZE;
 use crate::utils::MemoryRegion;
 use alloc::sync::Arc;
@@ -140,8 +139,6 @@ pub struct PerCpu {
     pub vrange_4k: RefCell<VirtualRange>,
     /// Address allocator for per-cpu 2m temporary mappings
     pub vrange_2m: RefCell<VirtualRange>,
-    /// Task list that has been assigned for scheduling on this CPU
-    runqueue: RWLockIrqSafe<RunQueue>,
 
     /// GHCB page for this CPU.
     ghcb: OnceCell<GhcbPage>,
@@ -171,7 +168,6 @@ impl PerCpu {
 
             vrange_4k: RefCell::new(VirtualRange::new()),
             vrange_2m: RefCell::new(VirtualRange::new()),
-            runqueue: RWLockIrqSafe::new(RunQueue::new()),
 
             shared: PerCpuShared::new(apic_id),
             ghcb: OnceCell::new(),
@@ -328,22 +324,6 @@ impl PerCpu {
         self.vm_range.handle_page_fault(vaddr, write)
     }
 
-    pub fn schedule_prepare(&self) -> Option<(TaskPointer, TaskPointer)> {
-        let ret = self.runqueue.lock_write().schedule_prepare();
-        if let Some((_, ref next)) = ret {
-            self.current_stack.set(next.stack_bounds());
-        };
-        ret
-    }
-
-    pub fn runqueue(&self) -> &RWLockIrqSafe<RunQueue> {
-        &self.runqueue
-    }
-
-    pub fn current_task(&self) -> TaskPointer {
-        self.runqueue.lock_read().current_task()
-    }
-
     pub fn set_tss_rsp0(&self, addr: VirtAddr) {
         let mut tss = self.tss.get();
         tss.stacks[0] = addr;
@@ -427,8 +407,4 @@ impl PerCpuVmsas {
             .iter()
             .any(|vmsa| vmsa.paddr == paddr)
     }
-}
-
-pub fn current_task() -> TaskPointer {
-    this_cpu().runqueue.lock_read().current_task()
 }

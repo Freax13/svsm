@@ -25,7 +25,6 @@ use crate::mm::alloc::AllocError;
 use crate::sev::ghcb::GhcbError;
 use crate::sev::msr_protocol::GhcbMsrError;
 use crate::sev::SevSnpError;
-use crate::task::TaskError;
 use elf::ElfError;
 use syscall::SysCallError;
 
@@ -86,8 +85,6 @@ pub enum SvsmError {
     Acpi,
     /// Errors from the filesystem.
     FileSystem(FsError),
-    /// Task management errors,
-    Task(TaskError),
     /// Errors from #VC handler
     Vc(VcError),
     /// The operation is not supported.

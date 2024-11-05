@@ -29,7 +29,6 @@ mod requests;
 mod serial;
 mod sev;
 mod string;
-mod task;
 mod types;
 mod utils;
 #[cfg(all(feature = "mstpm", not(test)))]
