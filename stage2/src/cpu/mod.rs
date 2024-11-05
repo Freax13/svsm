@@ -20,7 +20,6 @@ pub mod tlb;
 pub mod tss;
 pub mod vc;
 pub mod vmsa;
-pub mod x86;
 
 pub use gdt::{gdt, gdt_mut};
 pub use idt::common::X86ExceptionContext;
