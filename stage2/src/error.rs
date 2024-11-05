@@ -25,7 +25,6 @@ use crate::mm::alloc::AllocError;
 use crate::sev::ghcb::GhcbError;
 use crate::sev::msr_protocol::GhcbMsrError;
 use crate::sev::SevSnpError;
-use crate::syscall::ObjError;
 use crate::task::TaskError;
 use elf::ElfError;
 use syscall::SysCallError;
@@ -87,8 +86,6 @@ pub enum SvsmError {
     Acpi,
     /// Errors from the filesystem.
     FileSystem(FsError),
-    /// Obj related error
-    Obj(ObjError),
     /// Task management errors,
     Task(TaskError),
     /// Errors from #VC handler
@@ -111,26 +108,17 @@ impl From<ApicError> for SvsmError {
     }
 }
 
-impl From<ObjError> for SvsmError {
-    fn from(err: ObjError) -> Self {
-        Self::Obj(err)
-    }
-}
-
 impl From<SvsmError> for SysCallError {
     fn from(err: SvsmError) -> Self {
         match err {
             SvsmError::Alloc(AllocError::OutOfMemory) => SysCallError::ENOMEM,
             SvsmError::FileSystem(FsError::FileExists) => SysCallError::EEXIST,
 
-            SvsmError::FileSystem(FsError::FileNotFound) | SvsmError::Obj(ObjError::NotFound) => {
-                SysCallError::ENOTFOUND
-            }
+            SvsmError::FileSystem(FsError::FileNotFound) => SysCallError::ENOTFOUND,
 
             SvsmError::NotSupported => SysCallError::ENOTSUPP,
 
             SvsmError::FileSystem(FsError::Inval)
-            | SvsmError::Obj(ObjError::InvalidHandle)
             | SvsmError::Mem
             | SvsmError::InvalidAddress
             | SvsmError::InvalidBytes
