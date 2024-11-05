@@ -32,7 +32,6 @@ mod requests;
 mod serial;
 mod sev;
 mod string;
-mod svsm_paging;
 mod syscall;
 mod task;
 mod types;
