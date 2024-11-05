@@ -18,7 +18,6 @@ mod debug;
 mod error;
 mod fs;
 mod fw_cfg;
-mod greq;
 mod igvm_params;
 mod insn_decode;
 mod io;
