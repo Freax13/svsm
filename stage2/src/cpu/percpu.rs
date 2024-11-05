@@ -8,8 +8,6 @@ extern crate alloc;
 
 use super::tss::X86Tss;
 use crate::address::{PhysAddr, VirtAddr};
-use crate::cpu::tss::TSS_LIMIT;
-use crate::cpu::vmsa::init_svsm_vmsa;
 use crate::cpu::IrqState;
 use crate::error::SvsmError;
 use crate::locking::{LockGuard, RWLock, RWLockIrqSafe, SpinLock};
@@ -19,21 +17,15 @@ use crate::mm::vm::{Mapping, VMRMapping, VMR};
 use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE, SVSM_PERCPU_END};
 use crate::platform::SVSM_PLATFORM;
 use crate::sev::ghcb::{GhcbPage, GHCB};
-use crate::sev::hv_doorbell::{allocate_hv_doorbell_page, HVDoorbell};
-use crate::sev::msr_protocol::{hypervisor_ghcb_features, GHCBHvFeatures};
-use crate::sev::utils::RMPFlags;
-use crate::sev::vmsa::{VMSAControl, VmsaPage};
+use crate::sev::hv_doorbell::HVDoorbell;
 use crate::task::{RunQueue, TaskPointer};
-use crate::types::{PAGE_SIZE, SVSM_TR_FLAGS, SVSM_TSS};
+use crate::types::PAGE_SIZE;
 use crate::utils::MemoryRegion;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::{Cell, OnceCell, RefCell, RefMut, UnsafeCell};
 use core::mem::size_of;
 use core::ptr;
-use core::slice::Iter;
-use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use cpuarch::vmsa::VMSASegment;
 
 #[derive(Copy, Clone, Debug)]
 pub struct PerCpuInfo {
@@ -47,10 +39,6 @@ impl PerCpuInfo {
             apic_id,
             cpu_shared,
         }
-    }
-
-    pub fn as_cpu_ref(&self) -> &'static PerCpuShared {
-        self.cpu_shared
     }
 }
 
@@ -79,23 +67,6 @@ impl PerCpuAreas {
     unsafe fn push(&self, info: PerCpuInfo) {
         let ptr = self.areas.get().as_mut().unwrap();
         ptr.push(info);
-    }
-
-    pub fn iter(&self) -> Iter<'_, PerCpuInfo> {
-        let ptr = unsafe { self.areas.get().as_ref().unwrap() };
-        ptr.iter()
-    }
-
-    // Fails if no such area exists or its address is NULL
-    pub fn get(&self, apic_id: u32) -> Option<&'static PerCpuShared> {
-        // For this to not produce UB the only invariant we must
-        // uphold is that there are no mutations or mutable aliases
-        // going on when casting via as_ref(). This only happens via
-        // Self::push(), which is intentionally unsafe and private.
-        let ptr = unsafe { self.areas.get().as_ref().unwrap() };
-        ptr.iter()
-            .find(|info| info.apic_id == apic_id)
-            .map(|info| info.cpu_shared)
     }
 }
 
@@ -131,9 +102,6 @@ impl GuestVmsaRef {
 pub struct PerCpuShared {
     apic_id: u32,
     guest_vmsa: SpinLock<GuestVmsaRef>,
-    ipi_irr: [AtomicU32; 8],
-    ipi_pending: AtomicBool,
-    nmi_pending: AtomicBool,
 }
 
 impl PerCpuShared {
@@ -141,40 +109,11 @@ impl PerCpuShared {
         PerCpuShared {
             apic_id,
             guest_vmsa: SpinLock::new(GuestVmsaRef::new()),
-            ipi_irr: core::array::from_fn(|_| AtomicU32::new(0)),
-            ipi_pending: AtomicBool::new(false),
-            nmi_pending: AtomicBool::new(false),
         }
     }
 
     pub const fn apic_id(&self) -> u32 {
         self.apic_id
-    }
-
-    pub fn request_ipi(&self, vector: u8) {
-        let index = vector >> 5;
-        let bit = 1u32 << (vector & 31);
-        // Request the IPI via the IRR vector before signaling that an IPI has
-        // been requested.
-        self.ipi_irr[index as usize].fetch_or(bit, Ordering::Relaxed);
-        self.ipi_pending.store(true, Ordering::Release);
-    }
-
-    pub fn request_nmi(&self) {
-        self.nmi_pending.store(true, Ordering::Relaxed);
-        self.ipi_pending.store(true, Ordering::Release);
-    }
-
-    pub fn ipi_pending(&self) -> bool {
-        self.ipi_pending.swap(false, Ordering::Acquire)
-    }
-
-    pub fn ipi_irr_vector(&self, index: usize) -> u32 {
-        self.ipi_irr[index].swap(0, Ordering::Relaxed)
-    }
-
-    pub fn nmi_pending(&self) -> bool {
-        self.nmi_pending.swap(false, Ordering::Relaxed)
     }
 }
 
@@ -196,7 +135,6 @@ pub struct PerCpu {
 
     pgtbl: RefCell<Option<&'static mut PageTable>>,
     tss: Cell<X86Tss>,
-    svsm_vmsa: OnceCell<VmsaPage>,
     /// PerCpu Virtual Memory Range
     vm_range: VMR,
     /// Address allocator for per-cpu 4k temporary mappings
@@ -226,7 +164,6 @@ impl PerCpu {
             pgtbl: RefCell::new(None),
             irq_state: IrqState::new(),
             tss: Cell::new(X86Tss::new()),
-            svsm_vmsa: OnceCell::new(),
             vm_range: {
                 let mut vmr = VMR::new(SVSM_PERCPU_BASE, SVSM_PERCPU_END, PTEntryFlags::GLOBAL);
                 vmr.set_per_cpu(true);
@@ -352,31 +289,6 @@ impl PerCpu {
         self.ghcb().unwrap().register()
     }
 
-    fn setup_hv_doorbell(&self) -> Result<(), SvsmError> {
-        let doorbell = allocate_hv_doorbell_page(current_ghcb())?;
-        assert!(
-            self.hv_doorbell.get().is_none(),
-            "Attempted to reinitialize the HV doorbell page"
-        );
-        self.hv_doorbell.set(Some(doorbell));
-        Ok(())
-    }
-
-    /// Configures the HV doorbell page if restricted injection is enabled.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this function is called more than once for a given CPU and
-    /// restricted injection is enabled.
-    pub fn configure_hv_doorbell(&self) -> Result<(), SvsmError> {
-        // #HV doorbell configuration is only required if this system will make
-        // use of restricted injection.
-        if hypervisor_ghcb_features().contains(GHCBHvFeatures::SEV_SNP_RESTR_INJ) {
-            self.setup_hv_doorbell()?;
-        }
-        Ok(())
-    }
-
     pub fn map_self_stage2(&self) -> Result<(), SvsmError> {
         let vaddr = VirtAddr::from(ptr::from_ref(self));
         let paddr = virt_to_phys(vaddr);
@@ -384,45 +296,8 @@ impl PerCpu {
         self.get_pgtable().map_4k(SVSM_PERCPU_BASE, paddr, flags)
     }
 
-    /// Allocates and initializes a new VMSA for this CPU. Returns its
-    /// physical address and SEV features. Returns an error if allocation
-    /// fails of this CPU's VMSA was already initialized.
-    pub fn alloc_svsm_vmsa(&self, vtom: u64, start_rip: u64) -> Result<(PhysAddr, u64), SvsmError> {
-        if self.svsm_vmsa.get().is_some() {
-            // FIXME: add a more explicit error variant for this condition
-            return Err(SvsmError::Mem);
-        }
-
-        let mut vmsa = VmsaPage::new(RMPFlags::GUEST_VMPL)?;
-        let paddr = vmsa.paddr();
-
-        // Initialize VMSA
-        init_svsm_vmsa(&mut vmsa, vtom);
-        vmsa.tr = self.vmsa_tr_segment();
-        vmsa.rip = start_rip;
-        vmsa.rsp = self.get_top_of_stack().into();
-        vmsa.cr3 = self.get_pgtable().cr3_value().into();
-        vmsa.enable();
-
-        let sev_features = vmsa.sev_features;
-
-        // We already checked that the VMSA is unset
-        self.svsm_vmsa.set(vmsa).unwrap();
-
-        Ok((paddr, sev_features))
-    }
-
     pub fn guest_vmsa_ref(&self) -> LockGuard<'_, GuestVmsaRef> {
         self.shared().guest_vmsa.lock()
-    }
-
-    fn vmsa_tr_segment(&self) -> VMSASegment {
-        VMSASegment {
-            selector: SVSM_TSS,
-            flags: SVSM_TR_FLAGS,
-            limit: TSS_LIMIT as u32,
-            base: &raw const self.tss as u64,
-        }
     }
 
     /// Create a new virtual memory mapping in the PerCpu VMR
