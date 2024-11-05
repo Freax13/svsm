@@ -21,7 +21,6 @@ use crate::utils::MemoryRegion;
 
 use bootlib::platform::SvsmPlatformType;
 
-pub mod guest_cpu;
 pub mod native;
 pub mod snp;
 pub mod tdp;
