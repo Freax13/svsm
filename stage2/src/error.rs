@@ -18,7 +18,6 @@
 //! a way to convert a leaf error into a SvsmError via the [`From`] trait.
 
 use crate::cpu::vc::VcError;
-use crate::fs::FsError;
 use crate::fw_cfg::FwCfgError;
 use crate::insn_decode::InsnError;
 use crate::mm::alloc::AllocError;
@@ -83,8 +82,6 @@ pub enum SvsmError {
     FwCfg(FwCfgError),
     /// Errors related to ACPI parsing.
     Acpi,
-    /// Errors from the filesystem.
-    FileSystem(FsError),
     /// Errors from #VC handler
     Vc(VcError),
     /// The operation is not supported.
@@ -109,14 +106,10 @@ impl From<SvsmError> for SysCallError {
     fn from(err: SvsmError) -> Self {
         match err {
             SvsmError::Alloc(AllocError::OutOfMemory) => SysCallError::ENOMEM,
-            SvsmError::FileSystem(FsError::FileExists) => SysCallError::EEXIST,
-
-            SvsmError::FileSystem(FsError::FileNotFound) => SysCallError::ENOTFOUND,
 
             SvsmError::NotSupported => SysCallError::ENOTSUPP,
 
-            SvsmError::FileSystem(FsError::Inval)
-            | SvsmError::Mem
+            SvsmError::Mem
             | SvsmError::InvalidAddress
             | SvsmError::InvalidBytes
             | SvsmError::InvalidUtf8 => SysCallError::EINVAL,

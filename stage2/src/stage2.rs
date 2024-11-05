@@ -15,7 +15,6 @@ mod console;
 mod cpu;
 mod debug;
 mod error;
-mod fs;
 mod fw_cfg;
 mod igvm_params;
 mod insn_decode;
