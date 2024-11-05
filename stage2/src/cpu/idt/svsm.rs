@@ -23,9 +23,6 @@ use crate::platform::SVSM_PLATFORM;
 use crate::task::{is_task_fault, terminate};
 use core::arch::global_asm;
 
-use crate::syscall::*;
-use syscall::*;
-
 extern "C" {
     pub fn return_new_task();
     pub fn default_return();
@@ -223,34 +220,6 @@ extern "C" fn ex_handler_vmm_communication(ctxt: &mut X86ExceptionContext, vecto
             );
         }
     }
-}
-
-// System Call SoftIRQ handler
-#[no_mangle]
-extern "C" fn ex_handler_system_call(
-    ctxt: &mut X86ExceptionContext,
-    vector: usize,
-    event_type: IdtEventType,
-) {
-    // Ensure that this vector was not invoked as a hardware interrupt vector.
-    if event_type.is_external_interrupt(vector) {
-        panic!("Syscall handler invoked as external interrupt!");
-    }
-
-    if !user_mode(ctxt) {
-        panic!("Syscall handler called from kernel mode!");
-    }
-
-    let Ok(input) = TryInto::<u64>::try_into(ctxt.regs.rax) else {
-        ctxt.regs.rax = !0;
-        return;
-    };
-
-    ctxt.regs.rax = match input {
-        SYS_HELLO => sys_hello(),
-        SYS_EXIT => sys_exit(),
-        _ => !0,
-    };
 }
 
 #[no_mangle]

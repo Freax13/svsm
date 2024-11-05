@@ -29,7 +29,6 @@ mod requests;
 mod serial;
 mod sev;
 mod string;
-mod syscall;
 mod task;
 mod types;
 mod utils;
