@@ -5,8 +5,6 @@
 // Author: Dov Murik <dovmurik@linux.ibm.com>
 
 pub mod errors;
-#[cfg(all(feature = "mstpm", not(test)))]
-pub mod vtpm;
 
 use cpuarch::vmsa::{GuestVMExit, VMSA};
 
