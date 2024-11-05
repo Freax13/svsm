@@ -13,7 +13,6 @@ mod boot_stage2;
 mod config;
 mod console;
 mod cpu;
-mod crypto;
 mod debug;
 mod error;
 mod fs;
