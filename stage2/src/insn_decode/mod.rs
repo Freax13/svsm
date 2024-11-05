@@ -8,9 +8,7 @@ mod decode;
 mod insn;
 mod opcode;
 
-pub use decode::{DecodedInsnCtx, InsnMachineCtx, InsnMachineMem};
-#[cfg(any(test, fuzzing))]
-pub use insn::test_utils::TestCtx;
+pub use decode::{DecodedInsnCtx, InsnMachineCtx};
 pub use insn::{
     DecodedInsn, Immediate, Instruction, Operand, Register, SegRegister, MAX_INSN_SIZE,
 };

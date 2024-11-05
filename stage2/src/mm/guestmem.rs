@@ -6,7 +6,6 @@
 
 use crate::address::{Address, VirtAddr};
 use crate::error::SvsmError;
-use crate::insn_decode::{InsnError, InsnMachineMem};
 use core::arch::asm;
 use core::mem::{size_of, MaybeUninit};
 
@@ -223,20 +222,6 @@ impl<T: Copy> GuestPtr<T> {
     #[inline]
     pub unsafe fn write(&self, buf: T) -> Result<(), SvsmError> {
         unsafe { do_movsb(&buf, self.ptr) }
-    }
-}
-
-impl<T: Copy> InsnMachineMem for GuestPtr<T> {
-    type Item = T;
-
-    /// Safety: See the GuestPtr's read() method documentation for safety requirements.
-    unsafe fn mem_read(&self) -> Result<Self::Item, InsnError> {
-        self.read().map_err(|_| InsnError::MemRead)
-    }
-
-    /// Safety: See the GuestPtr's write() method documentation for safety requirements.
-    unsafe fn mem_write(&mut self, data: Self::Item) -> Result<(), InsnError> {
-        self.write(data).map_err(|_| InsnError::MemWrite)
     }
 }
 

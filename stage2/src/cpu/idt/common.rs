@@ -4,19 +4,15 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-extern crate alloc;
-
 use crate::address::{Address, VirtAddr};
 use crate::cpu::control_regs::{read_cr0, read_cr4};
 use crate::cpu::efer::read_efer;
 use crate::cpu::gdt::gdt;
 use crate::cpu::registers::{X86GeneralRegs, X86InterruptFrame};
-use crate::insn_decode::{InsnError, InsnMachineCtx, InsnMachineMem, Register, SegRegister};
+use crate::insn_decode::{InsnError, InsnMachineCtx, Register, SegRegister};
 use crate::locking::{RWLock, ReadLockGuard, WriteLockGuard};
-use crate::mm::GuestPtr;
 use crate::platform::SVSM_PLATFORM;
 use crate::types::{Bytes, SVSM_CS};
-use alloc::boxed::Box;
 use core::arch::{asm, global_asm};
 use core::mem;
 
@@ -136,19 +132,6 @@ impl InsnMachineCtx for X86ExceptionContext {
 
     fn read_cpl(&self) -> usize {
         self.frame.cs & 3
-    }
-
-    fn map_linear_addr<T: Copy + 'static>(
-        &self,
-        la: usize,
-        _write: bool,
-        _fetch: bool,
-    ) -> Result<Box<dyn InsnMachineMem<Item = T>>, InsnError> {
-        if user_mode(self) {
-            todo!();
-        } else {
-            Ok(Box::new(GuestPtr::<T>::new(VirtAddr::from(la))))
-        }
     }
 
     fn ioio_perm(&self, _port: u16, _size: Bytes, _io_read: bool) -> bool {

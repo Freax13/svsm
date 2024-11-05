@@ -100,13 +100,11 @@ impl Instruction {
 
 #[cfg(any(test, fuzzing))]
 pub mod test_utils {
-    extern crate alloc;
 
     use crate::cpu::control_regs::{CR0Flags, CR4Flags};
     use crate::cpu::efer::EFERFlags;
     use crate::insn_decode::*;
     use crate::types::Bytes;
-    use alloc::boxed::Box;
 
     pub const TEST_PORT: u16 = 0xE0;
 
@@ -250,15 +248,6 @@ pub mod test_utils {
             self.flags
         }
 
-        fn map_linear_addr<T: Copy + 'static>(
-            &self,
-            la: usize,
-            _write: bool,
-            _fetch: bool,
-        ) -> Result<Box<dyn InsnMachineMem<Item = T>>, InsnError> {
-            Ok(Box::new(TestMem { ptr: la as *mut T }))
-        }
-
         fn ioio_in(&self, _port: u16, size: Bytes) -> Result<u64, InsnError> {
             match size {
                 Bytes::One => Ok(self.iodata as u8 as u64),
@@ -325,33 +314,6 @@ pub mod test_utils {
                 Bytes::Eight => unsafe { *(pa as *mut u64) = data },
                 _ => return Err(InsnError::HandleMmioWrite),
             }
-            Ok(())
-        }
-    }
-
-    #[cfg(test)]
-    impl<T: Copy> InsnMachineMem for TestMem<T> {
-        type Item = T;
-
-        unsafe fn mem_read(&self) -> Result<Self::Item, InsnError> {
-            Ok(*(self.ptr))
-        }
-
-        unsafe fn mem_write(&mut self, data: Self::Item) -> Result<(), InsnError> {
-            *(self.ptr) = data;
-            Ok(())
-        }
-    }
-
-    #[cfg(fuzzing)]
-    impl<T: Copy> InsnMachineMem for TestMem<T> {
-        type Item = T;
-
-        unsafe fn mem_read(&self) -> Result<Self::Item, InsnError> {
-            Err(InsnError::MemRead)
-        }
-
-        unsafe fn mem_write(&mut self, _data: Self::Item) -> Result<(), InsnError> {
             Ok(())
         }
     }

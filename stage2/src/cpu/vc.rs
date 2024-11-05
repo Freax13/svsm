@@ -11,7 +11,6 @@ use crate::cpu::cpuid::{cpuid_table_raw, CpuidLeaf};
 use crate::cpu::percpu::current_ghcb;
 use crate::cpu::percpu::this_cpu;
 use crate::cpu::X86GeneralRegs;
-use crate::debug::gdbstub::svsm_gdbstub::handle_debug_exception;
 use crate::error::SvsmError;
 use crate::insn_decode::{
     DecodedInsn, DecodedInsnCtx, Immediate, Instruction, Operand, Register, MAX_INSN_SIZE,
@@ -112,42 +111,6 @@ pub fn stage2_handle_vc_exception(ctx: &mut X86ExceptionContext) -> Result<(), S
     match (err, insn_ctx.and_then(|d| d.insn())) {
         (SVM_EXIT_CPUID, Some(DecodedInsn::Cpuid)) => handle_cpuid(ctx),
         (SVM_EXIT_IOIO, Some(ins)) => handle_ioio(ctx, ghcb, ins),
-        (SVM_EXIT_MSR, Some(ins)) => handle_msr(ctx, ghcb, ins),
-        (SVM_EXIT_RDTSC, Some(DecodedInsn::Rdtsc)) => ghcb.rdtsc_regs(&mut ctx.regs),
-        (SVM_EXIT_RDTSCP, Some(DecodedInsn::Rdtsc)) => ghcb.rdtscp_regs(&mut ctx.regs),
-        _ => Err(VcError::new(ctx, VcErrorType::Unsupported).into()),
-    }?;
-
-    vc_finish_insn(ctx, &insn_ctx);
-    Ok(())
-}
-
-pub fn handle_vc_exception(ctx: &mut X86ExceptionContext, vector: usize) -> Result<(), SvsmError> {
-    let error_code = ctx.error_code;
-
-    // To handle NAE events, we're supposed to reset the VALID_BITMAP field of
-    // the GHCB. This is currently only relevant for IOIO, RDTSC and RDTSCP
-    // handling. This field is currently reset in the relevant GHCB methods
-    // but it would be better to move the reset out of the different
-    // handlers.
-    let ghcb = current_ghcb();
-
-    let insn_ctx = vc_decode_insn(ctx)?;
-
-    match (error_code, insn_ctx.as_ref().and_then(|d| d.insn())) {
-        // If the gdb stub is enabled then debugging operations such as single stepping
-        // will cause either an exception via DB_VECTOR if the DEBUG_SWAP sev_feature is
-        // clear, or a VC exception with an error code of X86_TRAP if set.
-        (X86_TRAP, _) => {
-            handle_debug_exception(ctx, vector);
-            Ok(())
-        }
-        (SVM_EXIT_CPUID, Some(DecodedInsn::Cpuid)) => handle_cpuid(ctx),
-        (SVM_EXIT_IOIO, Some(_)) => insn_ctx
-            .as_ref()
-            .unwrap()
-            .emulate(ctx)
-            .map_err(SvsmError::from),
         (SVM_EXIT_MSR, Some(ins)) => handle_msr(ctx, ghcb, ins),
         (SVM_EXIT_RDTSC, Some(DecodedInsn::Rdtsc)) => ghcb.rdtsc_regs(&mut ctx.regs),
         (SVM_EXIT_RDTSCP, Some(DecodedInsn::Rdtsc)) => ghcb.rdtscp_regs(&mut ctx.regs),
