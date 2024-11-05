@@ -11,12 +11,7 @@ pub mod page_visibility;
 mod pagebox;
 pub mod pagetable;
 pub mod validate;
-pub mod vm;
 
 pub use address_space::*;
 pub use guestmem::GuestPtr;
 pub use pagebox::*;
-
-pub use pagetable::PageTablePart;
-
-pub use alloc::{allocate_file_page, PageRef};
