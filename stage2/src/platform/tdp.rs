@@ -10,7 +10,7 @@ use crate::cpu::cpuid::CpuidResult;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::IOPort;
-use crate::mm::{virt_to_frame, PerCPUPageMappingGuard};
+use crate::mm::virt_to_frame;
 use crate::platform::{PageEncryptionMasks, PageStateChangeOp, PageValidateOp, SvsmPlatform};
 use crate::types::PageSize;
 use crate::utils::immut_after_init::ImmutAfterInitCell;
@@ -53,18 +53,6 @@ impl SvsmPlatform for TdpPlatform {
         Ok(())
     }
 
-    fn env_setup_svsm(&self) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn setup_percpu(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
-    fn setup_percpu_current(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks {
         // Find physical address size.
         let res = CpuidResult::get(0x80000008, 0);
@@ -96,23 +84,6 @@ impl SvsmPlatform for TdpPlatform {
         Err(SvsmError::Tdx)
     }
 
-    fn validate_physical_page_range(
-        &self,
-        region: MemoryRegion<PhysAddr>,
-        op: PageValidateOp,
-    ) -> Result<(), SvsmError> {
-        match op {
-            PageValidateOp::Validate => {
-                td_accept_memory(region.start().into(), region.len().try_into().unwrap());
-            }
-            PageValidateOp::Invalidate => {
-                let mapping = PerCPUPageMappingGuard::create(region.start(), region.end(), 0)?;
-                zero_mem_region(mapping.virt_addr(), mapping.virt_addr() + region.len());
-            }
-        }
-        Ok(())
-    }
-
     fn validate_virtual_page_range(
         &self,
         region: MemoryRegion<VirtAddr>,
@@ -136,24 +107,8 @@ impl SvsmPlatform for TdpPlatform {
         Ok(())
     }
 
-    fn configure_alternate_injection(&mut self, _alt_inj_requested: bool) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
-    }
-
-    fn change_apic_registration_state(&self, _incr: bool) -> Result<bool, SvsmError> {
-        Err(SvsmError::NotSupported)
-    }
-
-    fn query_apic_registration_state(&self) -> bool {
-        false
-    }
-
     fn use_interrupts(&self) -> bool {
         true
-    }
-
-    fn post_irq(&self, _icr: u64) -> Result<(), SvsmError> {
-        Err(SvsmError::Tdx)
     }
 
     fn eoi(&self) {}
@@ -162,10 +117,6 @@ impl SvsmPlatform for TdpPlatform {
         // Examine the APIC ISR to determine whether this interrupt vector is
         // active.  If so, it is assumed to be an external interrupt.
         // TODO - add code to read the APIC ISR.
-        todo!();
-    }
-
-    fn start_cpu(&self, _cpu: &PerCpu, _start_rip: u64) -> Result<(), SvsmError> {
         todo!();
     }
 }

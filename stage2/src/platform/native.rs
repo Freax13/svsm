@@ -7,7 +7,6 @@
 use crate::address::{PhysAddr, VirtAddr};
 use crate::console::init_svsm_console;
 use crate::cpu::cpuid::CpuidResult;
-use crate::cpu::msr::write_msr;
 use crate::cpu::percpu::PerCpu;
 use crate::error::SvsmError;
 use crate::io::{IOPort, DEFAULT_IO_DRIVER};
@@ -17,8 +16,6 @@ use crate::utils::MemoryRegion;
 
 #[cfg(debug_assertions)]
 use crate::mm::virt_to_phys;
-
-const APIC_MSR_ICR: u32 = 0x830;
 
 #[derive(Clone, Copy, Debug)]
 pub struct NativePlatform {}
@@ -43,18 +40,6 @@ impl SvsmPlatform for NativePlatform {
     }
 
     fn env_setup_late(&mut self, _debug_serial_port: u16) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn env_setup_svsm(&self) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn setup_percpu(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn setup_percpu_current(&self, _cpu: &PerCpu) -> Result<(), SvsmError> {
         Ok(())
     }
 
@@ -88,14 +73,6 @@ impl SvsmPlatform for NativePlatform {
         Ok(())
     }
 
-    fn validate_physical_page_range(
-        &self,
-        _region: MemoryRegion<PhysAddr>,
-        _op: PageValidateOp,
-    ) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
     fn validate_virtual_page_range(
         &self,
         _region: MemoryRegion<VirtAddr>,
@@ -116,25 +93,8 @@ impl SvsmPlatform for NativePlatform {
         Ok(())
     }
 
-    fn configure_alternate_injection(&mut self, _alt_inj_requested: bool) -> Result<(), SvsmError> {
-        Ok(())
-    }
-
-    fn change_apic_registration_state(&self, _incr: bool) -> Result<bool, SvsmError> {
-        Err(SvsmError::NotSupported)
-    }
-
-    fn query_apic_registration_state(&self) -> bool {
-        false
-    }
-
     fn use_interrupts(&self) -> bool {
         true
-    }
-
-    fn post_irq(&self, icr: u64) -> Result<(), SvsmError> {
-        write_msr(APIC_MSR_ICR, icr);
-        Ok(())
     }
 
     fn eoi(&self) {
@@ -146,9 +106,5 @@ impl SvsmPlatform for NativePlatform {
         // event delivery, so all events are assumed not to be external
         // interrupts.
         false
-    }
-
-    fn start_cpu(&self, _cpu: &PerCpu, _start_rip: u64) -> Result<(), SvsmError> {
-        todo!();
     }
 }

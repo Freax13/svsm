@@ -68,16 +68,6 @@ pub trait SvsmPlatform {
     /// the core system environment has been initialized.
     fn env_setup_late(&mut self, debug_serial_port: u16) -> Result<(), SvsmError>;
 
-    /// Performs initialiation of the environment specfic to the SVSM kernel
-    /// (for services not used by stage2).
-    fn env_setup_svsm(&self) -> Result<(), SvsmError>;
-
-    /// Completes initialization of a per-CPU object during construction.
-    fn setup_percpu(&self, cpu: &PerCpu) -> Result<(), SvsmError>;
-
-    /// Completes initialization of a per-CPU object on the target CPU.
-    fn setup_percpu_current(&self, cpu: &PerCpu) -> Result<(), SvsmError>;
-
     /// Determines the paging encryption masks for the current architecture.
     fn get_page_encryption_masks(&self) -> PageEncryptionMasks;
 
@@ -99,14 +89,6 @@ pub trait SvsmPlatform {
         op: PageStateChangeOp,
     ) -> Result<(), SvsmError>;
 
-    /// Marks a physical range of pages as valid or invalid for use as private
-    /// pages.  Not usable in stage2.
-    fn validate_physical_page_range(
-        &self,
-        region: MemoryRegion<PhysAddr>,
-        op: PageValidateOp,
-    ) -> Result<(), SvsmError>;
-
     /// Marks a virtual range of pages as valid or invalid for use as private
     /// pages.  Provided primarily for use in stage2 where validation by
     /// physical address cannot be supported.
@@ -116,21 +98,8 @@ pub trait SvsmPlatform {
         op: PageValidateOp,
     ) -> Result<(), SvsmError>;
 
-    /// Configures the use of alternate injection as requested.
-    fn configure_alternate_injection(&mut self, alt_inj_requested: bool) -> Result<(), SvsmError>;
-
-    /// Changes the state of APIC registration on this system, returning either
-    /// the current registration state or an error.
-    fn change_apic_registration_state(&self, incr: bool) -> Result<bool, SvsmError>;
-
-    /// Queries the state of APIC registration on this system.
-    fn query_apic_registration_state(&self) -> bool;
-
     /// Determines whether the platform supports interrupts to the SVSM.
     fn use_interrupts(&self) -> bool;
-
-    /// Signal an IRQ on one or more CPUs.
-    fn post_irq(&self, icr: u64) -> Result<(), SvsmError>;
 
     /// Perform an EOI of the current interrupt.
     fn eoi(&self);
@@ -138,9 +107,6 @@ pub trait SvsmPlatform {
     /// Determines whether a given interrupt vector was invoked as an external
     /// interrupt.
     fn is_external_interrupt(&self, vector: usize) -> bool;
-
-    /// Start an additional processor.
-    fn start_cpu(&self, cpu: &PerCpu, start_rip: u64) -> Result<(), SvsmError>;
 }
 
 //FIXME - remove Copy trait
