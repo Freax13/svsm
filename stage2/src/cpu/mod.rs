@@ -4,7 +4,6 @@
 //
 // Author: Joerg Roedel <jroedel@suse.de>
 
-pub mod apic;
 pub mod control_regs;
 pub mod cpuid;
 pub mod efer;
@@ -24,7 +23,6 @@ pub mod vc;
 pub mod vmsa;
 pub mod x86;
 
-pub use apic::LocalApic;
 pub use gdt::{gdt, gdt_mut};
 pub use idt::common::X86ExceptionContext;
 pub use irq_state::{irqs_disabled, irqs_enabled, IrqGuard, IrqState};
