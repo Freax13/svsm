@@ -4,7 +4,6 @@
 //
 // Author: Dov Murik <dovmurik@linux.ibm.com>
 
-pub mod apic;
 pub mod errors;
 #[cfg(all(feature = "mstpm", not(test)))]
 pub mod vtpm;
