@@ -15,7 +15,6 @@ use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::virtualrange::VirtualRange;
 use crate::mm::vm::{Mapping, VMRMapping, VMR};
 use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE, SVSM_PERCPU_END};
-use crate::platform::SVSM_PLATFORM;
 use crate::sev::ghcb::{GhcbPage, GHCB};
 use crate::sev::hv_doorbell::HVDoorbell;
 use crate::task::{RunQueue, TaskPointer};
@@ -327,23 +326,6 @@ impl PerCpu {
 
     pub fn handle_pf(&self, vaddr: VirtAddr, write: bool) -> Result<(), SvsmError> {
         self.vm_range.handle_page_fault(vaddr, write)
-    }
-
-    pub fn schedule_init(&self) -> TaskPointer {
-        // If the platform permits the use of interrupts, then ensure that
-        // interrupts will be enabled on the current CPU when leaving the
-        // scheduler environment.  This is done after disabling interrupts
-        // for scheduler initialization so that the first interrupt that can
-        // be received will always observe that there is a current task and
-        // not the boot thread.
-        if SVSM_PLATFORM.use_interrupts() {
-            unsafe {
-                self.irq_state.set_restore_state(true);
-            }
-        }
-        let task = self.runqueue.lock_write().schedule_init();
-        self.current_stack.set(task.stack_bounds());
-        task
     }
 
     pub fn schedule_prepare(&self) -> Option<(TaskPointer, TaskPointer)> {

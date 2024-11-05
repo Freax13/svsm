@@ -30,20 +30,17 @@
 
 extern crate alloc;
 
-use super::INITIAL_TASK_ID;
 use super::{Task, TaskListAdapter, TaskPointer, TaskRunListAdapter};
 use crate::address::Address;
 use crate::cpu::percpu::{irq_nesting_count, this_cpu};
 use crate::cpu::sse::sse_restore_context;
 use crate::cpu::sse::sse_save_context;
 use crate::cpu::IrqGuard;
-use crate::error::SvsmError;
 use crate::locking::SpinLock;
 use alloc::sync::Arc;
 use core::arch::{asm, global_asm};
 use core::cell::OnceCell;
 use core::mem::offset_of;
-use core::ptr::null_mut;
 use intrusive_collections::LinkedList;
 
 /// A RunQueue implementation that uses an RBTree to efficiently sort the priority
@@ -105,19 +102,6 @@ impl RunQueue {
         }
     }
 
-    /// Initialized the scheduler for this (RunQueue)[RunQueue]. This method is
-    /// called on the very first scheduling event when there is no current task
-    /// yet.
-    ///
-    /// # Returns
-    ///
-    /// [TaskPointer] to the first task to run
-    pub fn schedule_init(&mut self) -> TaskPointer {
-        let task = self.get_next_task();
-        self.current_task = Some(task.clone());
-        task
-    }
-
     /// Prepares a task switch. The function checks if a task switch needs to
     /// be done and return pointers to the current and next task. It will
     /// also call `handle_task()` on the current task in case a task-switch
@@ -150,33 +134,6 @@ impl RunQueue {
         }
     }
 
-    pub fn current_task_id(&self) -> u32 {
-        self.current_task
-            .as_ref()
-            .map_or(INITIAL_TASK_ID, |t| t.get_task_id())
-    }
-
-    /// Sets the idle task for this RunQueue. This function sets a
-    /// OnceCell at the end and can thus be only called once.
-    ///
-    /// # Returns
-    ///
-    /// Ok(()) on success, SvsmError on failure
-    ///
-    /// # Panics
-    ///
-    /// Panics if the idle task was already set.
-    pub fn set_idle_task(&self, task: TaskPointer) {
-        task.set_idle_task();
-
-        // Add idle task to global task list
-        TASKLIST.lock().list().push_front(task.clone());
-
-        self.idle_task
-            .set(task)
-            .expect("Idle task already allocated");
-    }
-
     /// Gets a pointer to the current task
     ///
     /// # Panics
@@ -204,18 +161,6 @@ impl TaskList {
             .get_or_insert_with(|| LinkedList::new(TaskListAdapter::new()))
     }
 
-    pub fn get_task(&self, id: u32) -> Option<TaskPointer> {
-        let task_list = &self.list.as_ref()?;
-        let mut cursor = task_list.front();
-        while let Some(task) = cursor.get() {
-            if task.get_task_id() == id {
-                return cursor.clone_pointer();
-            }
-            cursor.move_next();
-        }
-        None
-    }
-
     fn terminate(&mut self, task: TaskPointer) {
         // Set the task state as terminated. If the task being terminated is the
         // current task then the task context will still need to be in scope until
@@ -228,42 +173,6 @@ impl TaskList {
 }
 
 pub static TASKLIST: SpinLock<TaskList> = SpinLock::new(TaskList::new());
-
-pub fn create_kernel_task(entry: extern "C" fn()) -> Result<TaskPointer, SvsmError> {
-    let cpu = this_cpu();
-    let task = Task::create(cpu, entry)?;
-    TASKLIST.lock().list().push_back(task.clone());
-
-    // Put task on the runqueue of this CPU
-    cpu.runqueue().lock_write().handle_task(task.clone());
-
-    schedule();
-
-    Ok(task)
-}
-
-pub fn create_user_task(user_entry: usize) -> Result<TaskPointer, SvsmError> {
-    let cpu = this_cpu();
-    let task = Task::create_user(cpu, user_entry)?;
-    TASKLIST.lock().list().push_back(task.clone());
-
-    // Put task on the runqueue of this CPU
-    cpu.runqueue().lock_write().handle_task(task.clone());
-
-    Ok(task)
-}
-
-pub fn current_task() -> TaskPointer {
-    this_cpu().current_task()
-}
-
-/// Check to see if the task scheduled on the current processor has the given id
-pub fn is_current_task(id: u32) -> bool {
-    match &this_cpu().runqueue().lock_read().current_task {
-        Some(current_task) => current_task.get_task_id() == id,
-        None => id == INITIAL_TASK_ID,
-    }
-}
 
 /// Terminates the current task.
 ///
@@ -310,18 +219,6 @@ unsafe fn switch_to(prev: *const Task, next: *const Task) {
         in("rdi") next as u64,
         in("rdx") cr3,
         options(att_syntax));
-}
-
-/// Initializes the [RunQueue] on the current CPU. It will switch to the idle
-/// task and initialize the current_task field of the RunQueue. After this
-/// function has ran it is safe to call [`schedule()`] on the current CPU.
-pub fn schedule_init() {
-    unsafe {
-        let guard = IrqGuard::new();
-        let next = task_pointer(this_cpu().schedule_init());
-        switch_to(null_mut(), next);
-        drop(guard);
-    }
 }
 
 fn preemption_checks() {
@@ -372,12 +269,6 @@ pub fn schedule() {
     // If the previous task had terminated then we can release
     // it's reference here.
     let _ = this_cpu().runqueue().lock_write().terminated_task.take();
-}
-
-pub fn schedule_task(task: TaskPointer) {
-    task.set_task_running();
-    this_cpu().runqueue().lock_write().handle_task(task);
-    schedule();
 }
 
 global_asm!(
