@@ -10,7 +10,6 @@ pub mod guestmem;
 pub mod page_visibility;
 mod pagebox;
 pub mod pagetable;
-pub mod ptguards;
 pub mod validate;
 pub mod virtualrange;
 pub mod vm;
@@ -18,7 +17,6 @@ pub mod vm;
 pub use address_space::*;
 pub use guestmem::GuestPtr;
 pub use pagebox::*;
-pub use ptguards::*;
 
 pub use pagetable::PageTablePart;
 
