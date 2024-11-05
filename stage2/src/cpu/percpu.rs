@@ -6,20 +6,17 @@
 
 extern crate alloc;
 
-use super::tss::X86Tss;
 use crate::address::{PhysAddr, VirtAddr};
 use crate::cpu::IrqState;
 use crate::error::SvsmError;
-use crate::locking::{LockGuard, RWLock, SpinLock};
+use crate::locking::{LockGuard, SpinLock};
 use crate::mm::pagetable::{PTEntryFlags, PageTable};
 use crate::mm::virtualrange::VirtualRange;
-use crate::mm::vm::{Mapping, VMRMapping, VMR};
-use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE, SVSM_PERCPU_END};
+use crate::mm::{virt_to_phys, PageBox, SVSM_PERCPU_BASE};
 use crate::sev::ghcb::{GhcbPage, GHCB};
 use crate::sev::hv_doorbell::HVDoorbell;
 use crate::types::PAGE_SIZE;
 use crate::utils::MemoryRegion;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::cell::{Cell, OnceCell, RefCell, RefMut, UnsafeCell};
 use core::mem::size_of;
@@ -132,9 +129,6 @@ pub struct PerCpu {
     irq_state: IrqState,
 
     pgtbl: RefCell<Option<&'static mut PageTable>>,
-    tss: Cell<X86Tss>,
-    /// PerCpu Virtual Memory Range
-    vm_range: VMR,
     /// Address allocator for per-cpu 4k temporary mappings
     pub vrange_4k: RefCell<VirtualRange>,
     /// Address allocator for per-cpu 2m temporary mappings
@@ -159,12 +153,6 @@ impl PerCpu {
         Self {
             pgtbl: RefCell::new(None),
             irq_state: IrqState::new(),
-            tss: Cell::new(X86Tss::new()),
-            vm_range: {
-                let mut vmr = VMR::new(SVSM_PERCPU_BASE, SVSM_PERCPU_END, PTEntryFlags::GLOBAL);
-                vmr.set_per_cpu(true);
-                vmr
-            },
 
             vrange_4k: RefCell::new(VirtualRange::new()),
             vrange_2m: RefCell::new(VirtualRange::new()),
@@ -215,15 +203,6 @@ impl PerCpu {
         self.irq_state.enable();
     }
 
-    /// Get IRQ-disable nesting count on the current CPU
-    ///
-    /// # Returns
-    ///
-    /// Current nesting depth of irq_disable() calls.
-    pub fn irq_nesting_count(&self) -> isize {
-        self.irq_state.count()
-    }
-
     /// Sets up the CPU-local GHCB page.
     pub fn setup_ghcb(&self) -> Result<(), SvsmError> {
         let page = GhcbPage::new()?;
@@ -239,13 +218,6 @@ impl PerCpu {
 
     pub fn hv_doorbell(&self) -> Option<&'static HVDoorbell> {
         self.hv_doorbell.get()
-    }
-
-    /// Gets a pointer to the location of the HV doorbell pointer in the
-    /// PerCpu structure. Pointers and references have the same layout, so
-    /// the return type is equivalent to `*const *const HVDoorbell`.
-    pub fn hv_doorbell_addr(&self) -> *const &'static HVDoorbell {
-        self.hv_doorbell.as_ptr().cast()
     }
 
     pub fn get_top_of_stack(&self) -> VirtAddr {
@@ -294,41 +266,6 @@ impl PerCpu {
     pub fn guest_vmsa_ref(&self) -> LockGuard<'_, GuestVmsaRef> {
         self.shared().guest_vmsa.lock()
     }
-
-    /// Create a new virtual memory mapping in the PerCpu VMR
-    ///
-    /// # Arguments
-    ///
-    /// * `mapping` - The mapping to insert into the PerCpu VMR
-    ///
-    /// # Returns
-    ///
-    /// On success, a new ['VMRMapping'} that provides a virtual memory address for
-    /// the mapping which remains valid until the ['VRMapping'] is dropped.
-    ///
-    /// On error, an ['SvsmError'].
-    pub fn new_mapping(&self, mapping: Arc<Mapping>) -> Result<VMRMapping<'_>, SvsmError> {
-        VMRMapping::new(&self.vm_range, mapping)
-    }
-
-    /// Add the PerCpu virtual range into the provided pagetable
-    ///
-    /// # Arguments
-    ///
-    /// * `pt` - The page table to populate the the PerCpu range into
-    pub fn populate_page_table(&self, pt: &mut PageTable) {
-        self.vm_range.populate(pt);
-    }
-
-    pub fn handle_pf(&self, vaddr: VirtAddr, write: bool) -> Result<(), SvsmError> {
-        self.vm_range.handle_page_fault(vaddr, write)
-    }
-
-    pub fn set_tss_rsp0(&self, addr: VirtAddr) {
-        let mut tss = self.tss.get();
-        tss.stacks[0] = addr;
-        self.tss.set(tss);
-    }
 }
 
 pub fn this_cpu() -> &'static PerCpu {
@@ -359,15 +296,6 @@ pub unsafe fn irqs_enable() {
     this_cpu().irqs_enable();
 }
 
-/// Get IRQ-disable nesting count on the current CPU
-///
-/// # Returns
-///
-/// Current nesting depth of irq_disable() calls.
-pub fn irq_nesting_count() -> isize {
-    this_cpu().irq_nesting_count()
-}
-
 /// Gets the GHCB for this CPU.
 ///
 /// # Panics
@@ -376,35 +304,4 @@ pub fn irq_nesting_count() -> isize {
 /// [`PerCpu::setup_ghcb()`].
 pub fn current_ghcb() -> &'static GHCB {
     this_cpu().ghcb().unwrap()
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct VmsaRegistryEntry {
-    pub paddr: PhysAddr,
-    pub apic_id: u32,
-    pub guest_owned: bool,
-    pub in_use: bool,
-}
-
-// PERCPU VMSAs to apic_id map
-pub static PERCPU_VMSAS: PerCpuVmsas = PerCpuVmsas::new();
-
-#[derive(Debug)]
-pub struct PerCpuVmsas {
-    vmsas: RWLock<Vec<VmsaRegistryEntry>>,
-}
-
-impl PerCpuVmsas {
-    const fn new() -> Self {
-        Self {
-            vmsas: RWLock::new(Vec::new()),
-        }
-    }
-
-    pub fn exists(&self, paddr: PhysAddr) -> bool {
-        self.vmsas
-            .lock_read()
-            .iter()
-            .any(|vmsa| vmsa.paddr == paddr)
-    }
 }
